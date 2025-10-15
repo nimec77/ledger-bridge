@@ -15,11 +15,37 @@
 #### Parser Library (`ledger-parser`)
 **Zero external dependencies** - Standard library only!
 
-- Manual CSV parsing (commas and newlines)
-- Manual MT940 parsing (text format with field tags)
-- Manual CAMT.053 XML parsing (string pattern matching)
-- Manual date/time parsing (ISO 8601 → custom types)
-- Manual Error implementation (`std::error::Error` trait)
+**CSV Parsing:**
+- Line-by-line processing using `str::lines()`
+- Field splitting on commas (handle quoted fields if needed)
+- Skip metadata rows (headers/footers)
+- Detect transaction rows vs. summary rows
+- Handle localized column names (pattern matching)
+- Parse split debit/credit columns into unified transaction type
+
+**MT940 Parsing:**
+- Block extraction (`{1:...}{2:...}{4:...}`)
+- Tag-based parsing (`:20:`, `:25:`, `:60F:`, `:61:`, `:86:`, `:62F:`)
+- Multi-line field handling (`:86:` can span lines)
+- Date parsing: YYMMDD → YYYY-MM-DD (century inference)
+- Balance parsing: C/D indicator + date + currency + amount
+- Transaction line parsing: complex format with embedded delimiters
+- Amount parsing: handle comma as decimal separator
+
+**CAMT.053 XML Parsing:**
+- Simple pattern matching (no full XML parser)
+- Extract text between XML tags using `str::find()` and string slicing
+- Handle namespaces in tag matching
+- Parse nested structures (entries contain transaction details)
+- Extract attributes (`Ccy="XXX"`)
+- Handle multiple elements of same type (multiple `<Bal>` and `<Ntry>`)
+- Filter balance types (use OPBD/CLBD, ignore OPAV/CLAV)
+
+**Common Utilities:**
+- Date parsing: ISO 8601 (YYYY-MM-DD) and YYMMDD formats
+- Amount parsing: handle both comma and dot as decimal separators
+- String trimming and normalization
+- Error implementation (`std::error::Error` trait)
 
 #### CLI Application (`ledger-bridge-cli`)
 - `clap` (with derive feature) - CLI argument parsing
@@ -89,6 +115,12 @@ ledger-bridge/
 ├── README.md
 ├── idea.md
 ├── vision.md
+│
+├── example_files/          # Real-world format examples (for reference)
+│   ├── sources.md         # Source attribution for examples
+│   ├── *.camt             # CAMT.053 XML examples
+│   ├── *.mt940            # MT940 SWIFT message examples
+│   └── *.csv              # CSV statement examples
 │
 ├── ledger-parser/          # Library crate
 │   ├── Cargo.toml
@@ -249,60 +281,302 @@ CSV/MT940/CAMT.053 (String output)
 #[derive(Debug, Clone, PartialEq)]
 pub struct Statement {
     pub account_number: String,
-    pub currency: String,              // "USD", "EUR", etc.
+    pub currency: String,              // "USD", "EUR", "DKK", "RUB", etc.
     
     // Opening balance (starting position)
     pub opening_balance: f64,
     pub opening_date: String,          // ISO 8601: "YYYY-MM-DD"
+    pub opening_indicator: BalanceType, // Credit or Debit
     
     // Closing balance (ending position)
     pub closing_balance: f64,
     pub closing_date: String,          // ISO 8601: "YYYY-MM-DD"
+    pub closing_indicator: BalanceType, // Credit or Debit
     
     pub transactions: Vec<Transaction>,
+}
+
+/// Balance type indicator (credit or debit position)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BalanceType {
+    Credit,  // Positive balance (CRDT in CAMT, C in MT940)
+    Debit,   // Negative balance (DBIT in CAMT, D in MT940)
 }
 
 /// Individual transaction entry
 #[derive(Debug, Clone, PartialEq)]
 pub struct Transaction {
-    pub date: String,                  // ISO 8601: "YYYY-MM-DD"
-    pub amount: f64,                   // Positive = credit, Negative = debit
-    pub description: String,           // Transaction description/narrative
-    pub reference: Option<String>,     // Optional reference/transaction ID
+    pub booking_date: String,           // ISO 8601: "YYYY-MM-DD" (when booked)
+    pub value_date: Option<String>,     // ISO 8601: "YYYY-MM-DD" (value date, optional)
+    pub amount: f64,                    // Always positive number
+    pub transaction_type: TransactionType, // Credit or Debit
+    pub description: String,            // Transaction description/narrative
+    pub reference: Option<String>,      // Optional reference/transaction ID
+    pub counterparty_name: Option<String>, // Debtor/Creditor name
+    pub counterparty_account: Option<String>, // Counterparty account/IBAN
+}
+
+/// Transaction type (credit/debit indicator)
+#[derive(Debug, Clone, PartialEq)]
+pub enum TransactionType {
+    Credit,  // Money received (CRDT in CAMT, C in MT940)
+    Debit,   // Money paid (DBIT in CAMT, D in MT940)
 }
 ```
 
 ### Field Mapping Across Formats
 
+**Statement-level fields:**
+
 | Field | CSV | MT940 | CAMT.053 |
 |-------|-----|-------|----------|
-| account_number | "Account" | :25: tag | `<Acct><Id>` |
-| currency | "Currency" | :60F: (3 chars) | `<Amt Ccy="XXX">` |
-| opening_balance | "Opening" | :60F: amount | `<Bal><Tp><Cd>OPBD` |
-| opening_date | "From Date" | :60F: date | `<Bal><Dt>` |
-| closing_balance | "Closing" | :62F: amount | `<Bal><Tp><Cd>CLBD` |
-| closing_date | "To Date" | :62F: date | `<Bal><Dt>` |
-| date | "Date" | :61: date | `<BookgDt>` |
-| amount | "Amount" | :61: amount | `<Amt>` |
-| description | "Description" | :86: | `<RmtInf><Ustrd>` |
-| reference | "Reference" | :61: ref | `<NtryRef>` |
+| account_number | Account column | `:25:` tag | `<Acct><Id><IBAN>` or `<Othr><Id>` |
+| currency | Derived from amounts | `:60F:` (3 chars, e.g. "USD") | `<Amt Ccy="XXX">` attribute |
+| opening_balance | "Входящий остаток" row | `:60F:` amount (after C/D) | `<Bal><Tp><Cd>OPBD</Cd>` |
+| opening_date | Statement period start | `:60F:` date (YYMMDD) | `<Bal><Tp><Cd>OPBD</Cd><Dt>` |
+| opening_indicator | Derived from amount sign | `:60F:` first char (C/D) | `<Bal><CdtDbtInd>CRDT/DBIT` |
+| closing_balance | "Исходящий остаток" row | `:62F:` amount | `<Bal><Tp><Cd>CLBD</Cd>` |
+| closing_date | Statement period end | `:62F:` date | `<Bal><Tp><Cd>CLBD</Cd><Dt>` |
+| closing_indicator | Derived from amount sign | `:62F:` first char (C/D) | `<Bal><CdtDbtInd>CRDT/DBIT` |
+
+**Transaction-level fields:**
+
+| Field | CSV | MT940 | CAMT.053 |
+|-------|-----|-------|----------|
+| booking_date | "Дата проводки" | `:61:` date (YYMMDD) | `<BookgDt><Dt>` |
+| value_date | Same as booking | `:61:` date (often same) | `<ValDt><Dt>` |
+| amount | "Сумма по дебету/кредиту" | `:61:` amount | `<Amt Ccy="XXX">` |
+| transaction_type | Column (debit/credit split) | `:61:` C/D indicator | `<CdtDbtInd>CRDT/DBIT` |
+| description | "Назначение платежа" | `:86:` information | `<RmtInf><Ustrd>` or `<AddtlTxInf>` |
+| reference | "№ документа" | `:61:` reference field | `<NtryRef>` or `<TxId>` |
+| counterparty_name | Extracted from description | `:86:` (not standardized) | `<RltdPties><Dbtr><Nm>` or `<Cdtr><Nm>` |
+| counterparty_account | Debit/Credit account | `:86:` (not standardized) | `<DbtrAcct><Id>` or `<CdtrAcct><Id>` |
 
 ### Design Decisions
-✅ **Dates as strings** - ISO 8601 format, no external library  
-✅ **Signed amounts** - Negative = debit, Positive = credit  
+✅ **Dates as strings** - ISO 8601 format ("YYYY-MM-DD"), converted from YYMMDD (MT940) and XML dates (CAMT.053)  
+✅ **Unsigned amounts with type indicators** - Amount always positive, separate Credit/Debit enum  
+✅ **Balance indicators** - Explicit Credit/Debit enum for opening/closing balances  
 ✅ **Statement period** - Opening/closing dates define range  
-✅ **Minimal fields** - Only common fields across all formats  
+✅ **Optional fields** - value_date, reference, counterparty info (not always present)  
 ✅ **Derive traits** - Debug, Clone, PartialEq for testing  
 
+### Format-Specific Parsing Challenges
+
+**CSV:**
+- Multi-line headers and footers (metadata rows)
+- Localized column names (Russian in example)
+- Split debit/credit columns (need to merge into single transaction type)
+- Summary rows to skip ("Итого оборотов", "Количество операций")
+
+**MT940:**
+- SWIFT message envelope (`{1:...}{2:...}{4:...}`)
+- Tag-based structure (`:20:`, `:25:`, `:61:`, etc.)
+- Date format: YYMMDD (need century inference: 20YY for dates)
+- Balance format: C/D + YYMMDD + CCY + amount (e.g., "C250218USD2732398848,02")
+- Transaction line `:61:`: date + C/D + amount + type code + reference
+- Multi-line `:86:` fields (continuation lines)
+
+**CAMT.053 (XML):**
+- ISO 20022 schema (complex nested structure)
+- Multiple balance types: OPBD (opening booked), CLBD (closing booked), OPAV (opening available), CLAV (closing available)
+- Entries (`<Ntry>`) can contain batched transactions (`<TxDtls>`)
+- Remittance info can be structured (`<Strd>`) or unstructured (`<Ustrd>`)
+- Counterparty info: Debtor for credits, Creditor for debits
+- Multiple reference fields: `<NtryRef>`, `<EndToEndId>`, `<TxId>`, `<AcctSvcRef>`
+
 ### Simplifications
-- No timezone handling (date strings only)
-- No decimal precision types (f64 sufficient for tutorial)
-- No nested transaction details
-- Optional reference field (not all formats require it)
+- **No timezone handling** - Dates as strings, no time-of-day
+- **No decimal precision types** - f64 sufficient for tutorial (production would use `rust_decimal`)
+- **Single balance per type** - Ignore available balance (OPAV/CLAV), use only booked (OPBD/CLBD)
+- **Flatten batches** - CAMT.053 batched transactions treated as separate entries
+- **Basic XML parsing** - Manual string parsing, no full XML library
+- **No currency conversion** - Amounts in original currency
+- **Century assumption** - MT940 dates: 00-49 → 2000-2049, 50-99 → 1950-1999
 
 ---
 
-## 6. Error Handling
+## 6. Format Specifications (from Real Examples)
+
+### CSV Format Structure
+
+Based on the Russian Sberbank example:
+
+```
+Header rows (metadata):
+- Line 1: Empty or separators
+- Line 2: Report title and version
+- Line 3: Bank name
+- Line 4-8: Statement metadata (dates, account info)
+
+Data section:
+- Line 11: Column headers
+  Columns: Date | Debit Account | Credit Account | Debit Amount | Credit Amount | Doc# | VO | BIC/Bank | Description
+- Lines 13+: Transaction rows
+
+Footer rows (summary):
+- Blank line
+- "б/с" (summary header)
+- Transaction count row
+- Opening balance row ("Входящий остаток")
+- Totals row ("Итого оборотов")  
+- Closing balance row ("Исходящий остаток")
+```
+
+**Key observations:**
+- Debit and credit are in separate columns (not merged)
+- Account numbers include INN (tax ID) on separate line
+- Amounts use Russian decimal separator (comma)
+- Multi-line cells (account info spans 2 lines)
+
+### MT940 Format Structure
+
+Based on Goldman Sachs and other bank examples:
+
+```
+{1:F01BANKCODEXXX...}     Block 1: Basic header (sender BIC)
+{2:I940...}               Block 2: Application header (message type)
+{4:                       Block 4: Text block (actual data)
+:20:Reference             Transaction reference
+:25:AccountNumber         Account identification
+:28C:SequenceNo/Page      Statement number/sequence
+:60F:C/D+Date+CCY+Amt     Opening balance (F=final, M=intermediate)
+:61:Date+C/D+Amt+Type+Ref Statement line (transaction)
+:86:Description           Transaction details (multi-line)
+:62F:C/D+Date+CCY+Amt     Closing balance
+:64:C/D+Date+CCY+Amt      Available balance (optional)
+-}                        End of block 4
+```
+
+**Key observations:**
+- Tags can repeat (multiple `:61:` and `:86:` pairs)
+- `:86:` can span multiple lines
+- Balance format: indicator + date (YYMMDD) + currency (3 chars) + amount
+- Transaction line `:61:`: ValDate + BookDate (optional) + C/D + amount + type + ref
+- Some MT940 variants omit blocks {1} and {2}
+
+**Balance line example:** `:60M:C250218USD2732398848,02`
+- `M` = intermediate (F = final)
+- `C` = credit
+- `250218` = Feb 18, 2025
+- `USD` = currency
+- `2732398848,02` = amount
+
+**Transaction line example:** `:61:2502180218D12,01NTRFGSLNVSHSUTKWDR//GI2504900007841`
+- `250218` = value date
+- `0218` = booking date
+- `D` = debit
+- `12,01` = amount
+- `NTRF` = transaction type
+- `GSLNVSHSUTKWDR//GI2504900007841` = reference
+
+### CAMT.053 XML Format Structure
+
+Based on Danske Bank example (ISO 20022 standard):
+
+```xml
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.02">
+  <BkToCstmrStmt>                    <!-- Bank to Customer Statement -->
+    <GrpHdr>                          <!-- Group Header -->
+      <MsgId>...</MsgId>
+      <CreDtTm>2023-04-20T23:24:31</CreDtTm>
+    </GrpHdr>
+    <Stmt>                            <!-- Statement -->
+      <Id>...</Id>
+      <Acct>                          <!-- Account -->
+        <Id><IBAN>DK8030000001234567</IBAN></Id>
+        <Ccy>DKK</Ccy>
+        <Nm>Account name</Nm>
+        <Ownr>...</Ownr>
+      </Acct>
+      <Bal>                           <!-- Balance (multiple) -->
+        <Tp><CdOrPrtry><Cd>OPBD</Cd></CdOrPrtry></Tp>  <!-- Type: OPBD, CLBD, OPAV, CLAV -->
+        <Amt Ccy="DKK">12345.67</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>   <!-- CRDT or DBIT -->
+        <Dt><Dt>2023-04-20</Dt></Dt>
+      </Bal>
+      <Ntry>                          <!-- Entry (transaction) -->
+        <NtryRef>1</NtryRef>
+        <Amt Ccy="DKK">591.15</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <BookgDt><Dt>2023-04-20</Dt></BookgDt>
+        <ValDt><Dt>2023-04-20</Dt></ValDt>
+        <NtryDtls>
+          <TxDtls>                    <!-- Transaction Details -->
+            <Refs>
+              <EndToEndId>...</EndToEndId>
+              <TxId>...</TxId>
+            </Refs>
+            <RltdPties>               <!-- Related Parties -->
+              <Dbtr><Nm>Debtor name</Nm></Dbtr>
+              <DbtrAcct><Id><IBAN>...</IBAN></Id></DbtrAcct>
+              <Cdtr><Nm>Creditor name</Nm></Cdtr>
+              <CdtrAcct><Id><IBAN>...</IBAN></Id></CdtrAcct>
+            </RltdPties>
+            <RmtInf>                  <!-- Remittance Information -->
+              <Ustrd>Payment description</Ustrd>
+            </RmtInf>
+          </TxDtls>
+        </NtryDtls>
+      </Ntry>
+    </Stmt>
+  </BkToCstmrStmt>
+</Document>
+```
+
+**Key observations:**
+- Balance types: OPBD (opening booked), CLBD (closing booked), OPAV (opening available), CLAV (closing available), PRCD (previous closing)
+- One `<Ntry>` can contain multiple `<TxDtls>` (batched transactions)
+- Counterparty naming: Debtor for incoming, Creditor for outgoing
+- Dates in ISO format: `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM:SS`
+- Currency as attribute: `<Amt Ccy="DKK">`
+- Remittance info can be structured (`<Strd>`) or unstructured (`<Ustrd>`)
+
+**Balance type code meanings:**
+- `OPBD` - Opening Balance (Booked)
+- `CLBD` - Closing Balance (Booked)
+- `OPAV` - Opening Available Balance
+- `CLAV` - Closing Available Balance
+- `PRCD` - Previous Closing Date
+
+### Implementation Tips from Real Examples
+
+**CSV parsing tips:**
+1. **Identify transaction rows**: Look for lines with both date and amount fields populated
+2. **Skip summary rows**: Check for keywords like "Итого", "Количество", "Входящий", "Исходящий"
+3. **Handle multi-line cells**: Account info often spans 2+ lines (INN on second line)
+4. **Decimal separator**: Russian banks use comma, Western banks use dot
+5. **Extract account from debit/credit**: Statement account appears in either debit OR credit column consistently
+
+**MT940 parsing tips:**
+1. **Block 4 focus**: All useful data is in `{4:...}` block, can ignore blocks 1-3
+2. **Tag association**: Each `:61:` (transaction) is followed by `:86:` (description)
+3. **Multi-line handling**: Lines not starting with `:` are continuations of previous field
+4. **Century inference**: If YY >= 50, use 19YY; otherwise use 20YY
+5. **Amount format**: Both comma and dot can be decimal separators (bank-dependent)
+6. **Transaction line parsing**: Format varies by bank; split on known markers (C/D, amount pattern)
+
+**CAMT.053 parsing tips:**
+1. **Balance extraction**: Find all `<Bal>` elements, filter by `<Tp><Cd>` (use OPBD/CLBD)
+2. **Entry iteration**: Each `<Ntry>` is a statement line, may contain multiple `<TxDtls>`
+3. **Counterparty logic**: For CRDT transactions, use `<Dbtr>`; for DBIT, use `<Cdtr>`
+4. **Remittance info**: Try `<Ustrd>` first, fall back to `<Strd><CdtrRefInf><Ref>`
+5. **Namespace handling**: Match tags with or without namespace prefixes
+6. **IBAN extraction**: Look in `<Id><IBAN>` or `<Id><Othr><Id>` for non-IBAN accounts
+7. **Attribute parsing**: Currency in `Ccy="XXX"` attribute of `<Amt>` tag
+
+**Date handling (all formats):**
+- MT940: `YYMMDD` → apply century rule, format as `YYYY-MM-DD`
+- CAMT: May include time (`2023-04-20T23:24:31`) → extract date part only
+- CSV: Already in readable format, may need normalization
+
+**Amount handling (all formats):**
+- Parse both comma and dot as decimal separator
+- Remove thousands separators (spaces, commas)
+- Store as f64 (sufficient for tutorial; production should use decimal types)
+
+---
+
+## 7. Error Handling
 
 ### Unified Error Type
 
@@ -393,7 +667,7 @@ match parser.parse(&content) {
 
 ---
 
-## 7. Testing Strategy
+## 8. Testing Strategy
 
 ### Test Organization
 
@@ -478,7 +752,7 @@ fn test_mt940_to_camt053_conversion() {
 
 ---
 
-## 8. CLI Workflow
+## 9. CLI Workflow
 
 ### Command-Line Interface
 
@@ -583,6 +857,13 @@ fn main() {
 ### Technical Vision Overview
 
 **Ledger Bridge** is designed as a learning-focused Rust project that demonstrates trait-based polymorphism through practical financial data parsing.
+
+**Note:** This vision document has been refined based on analysis of real-world bank statement files:
+- **CAMT.053**: Danske Bank (Denmark) and Treasurease examples
+- **MT940**: Goldman Sachs, ASN Bank (Netherlands), and other international banks
+- **CSV**: Sberbank (Russia) with localized format
+
+All field mappings, format structures, and parsing strategies are based on actual production data.
 
 #### Key Design Decisions
 
