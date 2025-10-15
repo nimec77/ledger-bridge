@@ -13,7 +13,21 @@
 ### Dependencies
 
 #### Parser Library (`ledger-parser`)
-**Zero external dependencies** - Standard library only!
+
+**Core dependency:**
+- `serde` (with `derive` feature) - Serialization/deserialization framework
+
+**Why serde?**
+- Enables `Serialize`/`Deserialize` traits on data structures
+- Makes the data model interoperable with JSON, TOML, and other formats
+- Provides robust derive macros reducing boilerplate
+- Industry-standard choice for Rust data handling
+- Allows future extensibility (export to JSON, etc.)
+
+**Manual parsing approach maintained:**
+- MT940 and CAMT.053 parsers still implemented manually (string processing)
+- CSV parsing done manually (learning exercise)
+- Serde used only for data structure traits, not for parsing logic
 
 **CSV Parsing:**
 - Line-by-line processing using `str::lines()`
@@ -58,6 +72,14 @@ All conversions performed using:
 - `std::fmt::Display` - Output formatting
 - `std::error::Error` - Error handling
 - `std::io::Read` / `std::io::Write` - I/O operations
+
+### Serde Benefits
+With Serialize/Deserialize on all data structures:
+- **Future extensibility**: Easy to add JSON/TOML/YAML export (with `serde_json`, etc.)
+- **Testing**: Can serialize/deserialize test fixtures
+- **Debugging**: Can dump Statement as JSON for inspection
+- **API ready**: Data model ready for REST APIs or other integrations
+- **Learning**: Demonstrates idiomatic Rust pattern (serde is ubiquitous)
 
 ---
 
@@ -123,7 +145,7 @@ ledger-bridge/
 │   └── *.csv              # CSV statement examples
 │
 ├── ledger-parser/          # Library crate
-│   ├── Cargo.toml
+│   ├── Cargo.toml         # Dependencies: serde with derive feature
 │   ├── src/
 │   │   ├── lib.rs         # Public API exports
 │   │   │
@@ -141,9 +163,41 @@ ledger-bridge/
 │       └── conversion_test.rs
 │
 └── ledger-bridge-cli/      # CLI binary crate
-    ├── Cargo.toml
+    ├── Cargo.toml         # Dependencies: clap, ledger-parser
     └── src/
         └── main.rs
+```
+
+### Cargo.toml Examples
+
+**Workspace root (`Cargo.toml`):**
+```toml
+[workspace]
+members = ["ledger-parser", "ledger-bridge-cli"]
+resolver = "2"
+```
+
+**Library (`ledger-parser/Cargo.toml`):**
+```toml
+[package]
+name = "ledger-parser"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+```
+
+**CLI (`ledger-bridge-cli/Cargo.toml`):**
+```toml
+[package]
+name = "ledger-bridge-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ledger-parser = { path = "../ledger-parser" }
+clap = { version = "4.0", features = ["derive"] }
 ```
 
 ### Module Organization
@@ -277,8 +331,10 @@ CSV/MT940/CAMT.053 (String output)
 ### Core Data Structures
 
 ```rust
+use serde::{Deserialize, Serialize};
+
 /// Bank statement containing transactions and balances
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Statement {
     pub account_number: String,
     pub currency: String,              // "USD", "EUR", "DKK", "RUB", etc.
@@ -297,14 +353,14 @@ pub struct Statement {
 }
 
 /// Balance type indicator (credit or debit position)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum BalanceType {
     Credit,  // Positive balance (CRDT in CAMT, C in MT940)
     Debit,   // Negative balance (DBIT in CAMT, D in MT940)
 }
 
 /// Individual transaction entry
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Transaction {
     pub booking_date: String,           // ISO 8601: "YYYY-MM-DD" (when booked)
     pub value_date: Option<String>,     // ISO 8601: "YYYY-MM-DD" (value date, optional)
@@ -317,7 +373,7 @@ pub struct Transaction {
 }
 
 /// Transaction type (credit/debit indicator)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum TransactionType {
     Credit,  // Money received (CRDT in CAMT, C in MT940)
     Debit,   // Money paid (DBIT in CAMT, D in MT940)
@@ -358,7 +414,8 @@ pub enum TransactionType {
 ✅ **Balance indicators** - Explicit Credit/Debit enum for opening/closing balances  
 ✅ **Statement period** - Opening/closing dates define range  
 ✅ **Optional fields** - value_date, reference, counterparty info (not always present)  
-✅ **Derive traits** - Debug, Clone, PartialEq for testing  
+✅ **Serde integration** - All data structures derive Serialize/Deserialize for interoperability  
+✅ **Derive traits** - Debug, Clone, PartialEq for testing + Serialize/Deserialize for data exchange  
 
 ### Format-Specific Parsing Challenges
 
@@ -867,10 +924,12 @@ All field mappings, format structures, and parsing strategies are based on actua
 
 #### Key Design Decisions
 
-✅ **Zero dependencies** in parser library (standard library only)  
-✅ **Unified data model** (single Statement type)  
+✅ **Minimal dependencies** - Only serde for data structures (manual parsing maintained)  
+✅ **Unified data model** (single Statement type with Serialize/Deserialize)  
 ✅ **Generic traits** (not tied to specific types)  
 ✅ **Simple error handling** (one ParseError type)  
+✅ **Manual parsing** - All format parsers hand-written for learning  
+✅ **Serde integration** - Data structures serializable for future extensibility  
 ✅ **Minimal testing** (unit + integration)  
 ✅ **Clean CLI** (clap for argument parsing)  
 ✅ **KISS principle** throughout
