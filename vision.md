@@ -24,10 +24,19 @@
 - Industry-standard choice for Rust data handling
 - Allows future extensibility (export to JSON, etc.)
 
-**Manual parsing approach maintained:**
-- MT940 and CAMT.053 parsers still implemented manually (string processing)
-- CSV parsing done manually (learning exercise)
+**Parsing approach flexibility:**
+- You can use serde, combinatorial parsers, or even manually
+- **Main requirement**: Parsers must read data using `std::io::BufRead` or `std::io::Read` traits
+- This is a learning exercise - choose the simplest approach (KISS principle)
+- MT940 and CAMT.053 parsers can be implemented manually (string processing)
+- CSV parsing can be done manually or with helper libraries
 - Serde used only for data structure traits, not for parsing logic
+
+**Optional parsing libraries (keep it simple):**
+- `csv` crate - Simple CSV parsing with BufRead support (if you prefer not to parse CSV manually)
+- `quick-xml` - Minimal XML parser for CAMT.053 (alternative to manual string parsing)
+- Parser combinators like `nom` or `winnow` - For MT940 format (only if needed for learning)
+- **Remember**: Use only what you need to learn; avoid over-engineering
 
 **CSV Parsing:**
 - Line-by-line processing using `str::lines()`
@@ -71,7 +80,9 @@ All conversions performed using:
 - `TryFrom<T>` / `TryInto<T>` - Fallible conversions
 - `std::fmt::Display` - Output formatting
 - `std::error::Error` - Error handling
-- `std::io::Read` / `std::io::Write` - I/O operations
+- `std::io::BufRead` - **Primary I/O trait for parsing** (efficient buffered reading)
+- `std::io::Read` - Can be wrapped with `BufReader` for BufRead support
+- `std::io::Write` - Output operations (formatters produce Strings)
 
 ### Serde Benefits
 With Serialize/Deserialize on all data structures:
@@ -247,12 +258,16 @@ clap = { version = "4.0", features = ["derive"] }
 **Generic traits - not tied to specific data types**
 
 ```rust
+use std::io::BufRead;
+
 /// Generic parser trait - works with ANY type T
+/// Requirement: Must read data using BufRead or Read traits
 pub trait Parser<T> {
     type Error;
     
-    /// Parse input string into type T
-    fn parse(&self, input: &str) -> Result<T, Self::Error>;
+    /// Parse input from a BufRead reader into type T
+    /// This allows reading from files, stdin, or any buffered source
+    fn parse<R: BufRead>(&self, reader: R) -> Result<T, Self::Error>;
 }
 
 /// Generic formatter trait - works with ANY type T  
@@ -263,6 +278,13 @@ pub trait Formatter<T> {
     fn format(&self, data: &T) -> Result<String, Self::Error>;
 }
 ```
+
+**Why BufRead?**
+- Works with files, stdin, network streams, in-memory buffers
+- Enables efficient line-by-line reading for CSV and MT940
+- Reduces memory usage for large files
+- Standard Rust I/O pattern (learning focus)
+- Can be created from `Read` using `BufReader::new(reader)`
 
 ### Unified Data Model Approach
 
@@ -293,9 +315,32 @@ pub struct Mt940Parser;
 pub struct Camt053Parser;
 
 // All implement the same traits for Statement
-impl Parser<Statement> for CsvParser { ... }
-impl Parser<Statement> for Mt940Parser { ... }
-impl Parser<Statement> for Camt053Parser { ... }
+impl Parser<Statement> for CsvParser { 
+    type Error = ParseError;
+    
+    fn parse<R: BufRead>(&self, reader: R) -> Result<Statement, Self::Error> {
+        // Read line-by-line from BufRead
+        // Parse CSV format into Statement
+    }
+}
+
+impl Parser<Statement> for Mt940Parser { 
+    type Error = ParseError;
+    
+    fn parse<R: BufRead>(&self, reader: R) -> Result<Statement, Self::Error> {
+        // Read from BufRead (can read all or line-by-line)
+        // Parse MT940 format into Statement
+    }
+}
+
+impl Parser<Statement> for Camt053Parser { 
+    type Error = ParseError;
+    
+    fn parse<R: BufRead>(&self, reader: R) -> Result<Statement, Self::Error> {
+        // Read XML from BufRead
+        // Parse CAMT.053 format into Statement
+    }
+}
 
 impl Formatter<Statement> for CsvParser { ... }
 impl Formatter<Statement> for Mt940Parser { ... }
@@ -305,9 +350,9 @@ impl Formatter<Statement> for Camt053Parser { ... }
 ### Conversion Flow
 
 ```
-CSV/MT940/CAMT.053 (String input)
+File/Stdin/BufRead (Input source)
          ↓
-   Parser::parse()
+   Parser::parse(reader)
          ↓
      Statement (unified type)
          ↓
@@ -316,13 +361,29 @@ CSV/MT940/CAMT.053 (String input)
 CSV/MT940/CAMT.053 (String output)
 ```
 
-**Format conversion**: Parse from format A → Unified Statement → Format to B
+**Format conversion**: Parse from format A (via BufRead) → Unified Statement → Format to B
+
+**Example:**
+```rust
+use std::io::BufReader;
+use std::fs::File;
+
+// Read from file
+let file = File::open("input.csv")?;
+let reader = BufReader::new(file);
+let statement = CsvParser.parse(reader)?;
+
+// Convert to another format
+let output = Mt940Parser.format(&statement)?;
+```
 
 ### Key Benefits
 ✅ **Generic traits**: Work with any type, not just Statement  
 ✅ **Simple conversions**: No complex type mapping  
 ✅ **Unified representation**: One data model for all formats  
 ✅ **Extensible**: Add new formats without changing traits  
+✅ **BufRead-based parsing**: Memory-efficient, works with files/stdin/network/any byte source  
+✅ **Standard I/O patterns**: Learn idiomatic Rust I/O using std library traits  
 
 ---
 
@@ -689,15 +750,21 @@ impl From<std::io::Error> for ParseError {
 ### Usage Pattern
 
 ```rust
+use std::io::{BufRead, BufReader};
+
 // Both Parser and Formatter use ParseError
 impl Parser<Statement> for CsvParser {
     type Error = ParseError;
     
-    fn parse(&self, input: &str) -> Result<Statement, Self::Error> {
-        if input.is_empty() {
-            return Err(ParseError::CsvError("Empty input".to_string()));
-        }
-        // ... parsing logic
+    fn parse<R: BufRead>(&self, reader: R) -> Result<Statement, Self::Error> {
+        let mut lines = reader.lines();
+        
+        // Check if empty
+        let first_line = lines.next()
+            .ok_or(ParseError::CsvError("Empty input".to_string()))?
+            .map_err(|e| ParseError::IoError(e.to_string()))?;
+        
+        // ... parsing logic using BufRead
     }
 }
 ```
@@ -705,11 +772,20 @@ impl Parser<Statement> for CsvParser {
 ### CLI Error Handling
 
 ```rust
+use std::io::BufReader;
+
 // CLI displays errors and exits gracefully
-match parser.parse(&content) {
+// Example: reading from file
+let file = File::open("input.csv").unwrap_or_else(|e| {
+    eprintln!("Failed to open file: {}", e);
+    std::process::exit(1);
+});
+
+let reader = BufReader::new(file);
+match parser.parse(reader) {
     Ok(statement) => { /* process */ },
     Err(e) => {
-        eprintln!("Error: {}", e);
+        eprintln!("Parse error: {}", e);
         std::process::exit(1);
     }
 }
@@ -746,12 +822,14 @@ ledger-parser/
 mod tests {
     use super::*;
     use crate::model::{Statement, Transaction};
+    use std::io::BufReader;
     
     #[test]
     fn test_parse_csv() {
         let input = "Account,Currency,...\nACC001,USD,...";
+        let reader = BufReader::new(input.as_bytes());
         let parser = CsvParser;
-        let result = parser.parse(input);
+        let result = parser.parse(reader);
         assert!(result.is_ok());
     }
     
@@ -765,9 +843,21 @@ mod tests {
     
     #[test]
     fn test_parse_error() {
+        let input = "";
+        let reader = BufReader::new(input.as_bytes());
         let parser = CsvParser;
-        let result = parser.parse("");
+        let result = parser.parse(reader);
         assert!(result.is_err());
+    }
+    
+    #[test]
+    fn test_parse_from_bytes() {
+        // BufRead works with any byte source
+        let data: &[u8] = b"Account,Currency\nACC001,USD";
+        let reader = BufReader::new(data);
+        let parser = CsvParser;
+        let result = parser.parse(reader);
+        assert!(result.is_ok());
     }
 }
 ```
@@ -777,11 +867,13 @@ mod tests {
 ```rust
 // tests/integration_test.rs
 use ledger_parser::*;
+use std::io::BufReader;
 
 #[test]
 fn test_csv_to_mt940_conversion() {
     let csv_input = "...";
-    let statement = formats::CsvParser.parse(csv_input).unwrap();
+    let reader = BufReader::new(csv_input.as_bytes());
+    let statement = formats::CsvParser.parse(reader).unwrap();
     let mt940_output = formats::Mt940Parser.format(&statement).unwrap();
     assert!(!mt940_output.is_empty());
 }
@@ -789,9 +881,21 @@ fn test_csv_to_mt940_conversion() {
 #[test]
 fn test_mt940_to_camt053_conversion() {
     let mt940_input = "...";
-    let statement = formats::Mt940Parser.parse(mt940_input).unwrap();
+    let reader = BufReader::new(mt940_input.as_bytes());
+    let statement = formats::Mt940Parser.parse(reader).unwrap();
     let camt053_output = formats::Camt053Parser.format(&statement).unwrap();
     assert!(!camt053_output.is_empty());
+}
+
+#[test]
+fn test_round_trip_conversion() {
+    // Test CSV -> Statement -> CSV
+    let original_csv = "...";
+    let reader = BufReader::new(original_csv.as_bytes());
+    let statement = formats::CsvParser.parse(reader).unwrap();
+    let output_csv = formats::CsvParser.format(&statement).unwrap();
+    // Validate output has expected structure
+    assert!(output_csv.contains("Account"));
 }
 ```
 
@@ -858,34 +962,57 @@ struct Cli {
 ### Main Logic Flow
 
 ```rust
+use std::io::{self, BufReader, BufRead};
+use std::fs::File;
+
 fn main() {
     let cli = Cli::parse();
     
-    // 1. Read input (file or stdin)
-    let content = match &cli.input {
-        Some(path) => std::fs::read_to_string(path).expect("Failed to read input"),
-        None => read_stdin().expect("Failed to read stdin"),
+    // 1. Create BufRead reader from input (file or stdin)
+    let reader: Box<dyn BufRead> = match &cli.input {
+        Some(path) => {
+            let file = File::open(path).unwrap_or_else(|e| {
+                eprintln!("Failed to open input file: {}", e);
+                std::process::exit(1);
+            });
+            Box::new(BufReader::new(file))
+        },
+        None => {
+            // Read from stdin
+            Box::new(BufReader::new(io::stdin()))
+        }
     };
     
-    // 2. Select parser based on --in-format (case-insensitive)
+    // 2. Select parser based on --in-format (case-insensitive) and parse using BufRead
     let statement = match cli.in_format.to_lowercase().as_str() {
-        "csv" => CsvParser.parse(&content),
-        "mt940" => Mt940Parser.parse(&content),
-        "camt053" => Camt053Parser.parse(&content),
-        _ => { eprintln!("Unknown format"); std::process::exit(1); }
-    }.unwrap_or_else(|e| { eprintln!("Parse error: {}", e); std::process::exit(1); });
+        "csv" => CsvParser.parse(reader),
+        "mt940" => Mt940Parser.parse(reader),
+        "camt053" => Camt053Parser.parse(reader),
+        _ => { eprintln!("Unknown input format: {}", cli.in_format); std::process::exit(1); }
+    }.unwrap_or_else(|e| { 
+        eprintln!("Parse error: {}", e); 
+        std::process::exit(1); 
+    });
     
     // 3. Select formatter based on --out-format (case-insensitive)
     let output = match cli.out_format.to_lowercase().as_str() {
         "csv" => CsvParser.format(&statement),
         "mt940" => Mt940Parser.format(&statement),
         "camt053" => Camt053Parser.format(&statement),
-        _ => { eprintln!("Unknown format"); std::process::exit(1); }
-    }.unwrap_or_else(|e| { eprintln!("Format error: {}", e); std::process::exit(1); });
+        _ => { eprintln!("Unknown output format: {}", cli.out_format); std::process::exit(1); }
+    }.unwrap_or_else(|e| { 
+        eprintln!("Format error: {}", e); 
+        std::process::exit(1); 
+    });
     
     // 4. Write output (file or stdout)
     match &cli.output {
-        Some(path) => std::fs::write(path, output).expect("Failed to write output"),
+        Some(path) => {
+            std::fs::write(path, output).unwrap_or_else(|e| {
+                eprintln!("Failed to write output file: {}", e);
+                std::process::exit(1);
+            });
+        },
         None => print!("{}", output),
     }
 }
@@ -924,11 +1051,12 @@ All field mappings, format structures, and parsing strategies are based on actua
 
 #### Key Design Decisions
 
-✅ **Minimal dependencies** - Only serde for data structures (manual parsing maintained)  
+✅ **Minimal dependencies** - Only serde for data structures (optional helper libraries for parsing)  
+✅ **BufRead-based parsing** - All parsers use `std::io::BufRead` for efficient I/O  
 ✅ **Unified data model** (single Statement type with Serialize/Deserialize)  
 ✅ **Generic traits** (not tied to specific types)  
 ✅ **Simple error handling** (one ParseError type)  
-✅ **Manual parsing** - All format parsers hand-written for learning  
+✅ **Flexible parsing approaches** - Manual, serde, or combinatorial parsers (keep it simple)  
 ✅ **Serde integration** - Data structures serializable for future extensibility  
 ✅ **Minimal testing** (unit + integration)  
 ✅ **Clean CLI** (clap for argument parsing)  
