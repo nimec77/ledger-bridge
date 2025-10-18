@@ -4,8 +4,8 @@
 
 pub mod model;
 pub mod error;
-pub mod formats {
-    pub mod csv;
+mod formats {
+    pub(crate) mod csv;
 }
 
 // Re-export shared types for convenience
