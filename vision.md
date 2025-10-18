@@ -1,6 +1,6 @@
 # Technical Vision - Ledger Bridge
 
-> A KISS-focused technical blueprint for learning trait-based polymorphism in Rust
+> A KISS-focused technical blueprint for learning Rust standard library I/O traits and type conversions
 
 ---
 
@@ -23,30 +23,41 @@
 - Provides robust derive macros reducing boilerplate
 - Industry-standard choice for Rust data handling
 - Allows future extensibility (export to JSON, etc.)
+- Essential for XML parsing with quick-xml's serde integration
 
-**Parsing approach flexibility:**
-- You can use serde, combinatorial parsers, or even manually
-- **Main requirement**: Parsers must read data using `std::io::BufRead` or `std::io::Read` traits
-- This is a learning exercise - choose the simplest approach (KISS principle)
-- MT940 and CAMT.053 parsers can be implemented manually (string processing)
-- CSV parsing can be done manually or with helper libraries
-- Serde used only for data structure traits, not for parsing logic
+**Main requirement:** 
+- **Parsers must use `std::io::Read` trait for input**
+- **Formatters must use `std::io::Write` trait for output**
+- This demonstrates how standard library traits enable code reuse across different data sources (files, stdin, buffers, network)
+- No need for separate implementations for each I/O source
 
-**Optional parsing libraries (keep it simple):**
-- `csv` crate - Simple CSV parsing with BufRead support (if you prefer not to parse CSV manually)
-- `quick-xml` - Minimal XML parser for CAMT.053 (alternative to manual string parsing)
-- Parser combinators like `nom` or `winnow` - For MT940 format (only if needed for learning)
-- **Remember**: Use only what you need to learn; avoid over-engineering
+**Recommended parsing libraries:**
+- **`csv`** - Fast, flexible CSV reader/writer with excellent Read/Write support (Trust Score: 9.1)
+  - Supports Serde for automatic struct serialization/deserialization
+  - Efficient buffering and memory usage
+  - Handles quoted fields, custom delimiters, and edge cases
+  
+- **`quick-xml`** - High-performance XML parser for CAMT.053 (Trust Score: 9.2)
+  - Native Read/Write trait support
+  - Event-based parsing (similar to SAX)
+  - Serde integration for automatic struct deserialization
+  - Excellent for ISO 20022 XML formats
+  
+- **Manual parsing for MT940** - String processing recommended
+  - MT940 format is intentionally complex and educational
+  - Requires understanding of tag-based parsing
+  - Good practice for manual text processing
 
-**CSV Parsing:**
-- Line-by-line processing using `str::lines()`
-- Field splitting on commas (handle quoted fields if needed)
-- Skip metadata rows (headers/footers)
-- Detect transaction rows vs. summary rows
-- Handle localized column names (pattern matching)
+**CSV Parsing (using `csv` crate):**
+- Use `csv::Reader::from_reader()` to read from any `impl Read`
+- Automatic field parsing and type conversion via Serde
+- Handle quoted fields, escaped quotes, and custom delimiters
+- Skip metadata rows (headers/footers) manually if needed
 - Parse split debit/credit columns into unified transaction type
+- Write using `csv::Writer::from_writer()` to any `impl Write`
 
-**MT940 Parsing:**
+**MT940 Parsing (manual implementation):**
+- Read entire input using `Read::read_to_string()` or buffered reading
 - Block extraction (`{1:...}{2:...}{4:...}`)
 - Tag-based parsing (`:20:`, `:25:`, `:60F:`, `:61:`, `:86:`, `:62F:`)
 - Multi-line field handling (`:86:` can span lines)
@@ -54,15 +65,18 @@
 - Balance parsing: C/D indicator + date + currency + amount
 - Transaction line parsing: complex format with embedded delimiters
 - Amount parsing: handle comma as decimal separator
+- **This format intentionally requires manual parsing to demonstrate text processing skills**
 
-**CAMT.053 XML Parsing:**
-- Simple pattern matching (no full XML parser)
-- Extract text between XML tags using `str::find()` and string slicing
+**CAMT.053 XML Parsing (using `quick-xml` crate):**
+- Use `quick_xml::Reader::from_reader()` to read from any `impl Read`
+- Event-based parsing with `read_event_into()` method
+- Optional: Use Serde deserialization with `#[derive(Deserialize)]` for automatic struct mapping
 - Handle namespaces in tag matching
 - Parse nested structures (entries contain transaction details)
-- Extract attributes (`Ccy="XXX"`)
+- Extract attributes (`Ccy="XXX"`) from events
 - Handle multiple elements of same type (multiple `<Bal>` and `<Ntry>`)
 - Filter balance types (use OPBD/CLBD, ignore OPAV/CLAV)
+- Write using `quick_xml::Writer::new()` to any `impl Write`
 
 **Common Utilities:**
 - Date parsing: ISO 8601 (YYYY-MM-DD) and YYMMDD formats
@@ -75,14 +89,25 @@
 - `ledger-parser` (workspace dependency)
 
 ### Standard Library Traits (Core Learning Focus)
-All conversions performed using:
-- `From<T>` / `Into<T>` - Infallible conversions
-- `TryFrom<T>` / `TryInto<T>` - Fallible conversions
-- `std::fmt::Display` - Output formatting
-- `std::error::Error` - Error handling
-- `std::io::BufRead` - **Primary I/O trait for parsing** (efficient buffered reading)
-- `std::io::Read` - Can be wrapped with `BufReader` for BufRead support
-- `std::io::Write` - Output operations (formatters produce Strings)
+The project demonstrates practical usage of Rust standard library traits:
+
+**I/O Traits (Primary Focus):**
+- `std::io::Read` - **Primary input trait for parsing** (works with files, stdin, buffers, network streams)
+- `std::io::Write` - **Primary output trait for formatting** (works with files, stdout, buffers)
+- These traits enable **static polymorphism** through generics
+- No need for separate implementations for each data source
+
+**Type Conversion Traits:**
+- `From<T>` / `Into<T>` - **Used for format conversions** (infallible)
+  - Example: `impl From<Mt940> for Camt053`
+  - Enables idiomatic Rust type conversions
+  - Automatic `Into` implementation from `From`
+- `TryFrom<T>` / `TryInto<T>` - Fallible conversions (if needed)
+
+**Error Handling:**
+- `std::error::Error` - Standard error trait
+- `std::fmt::Display` - User-friendly error messages
+- `From<std::io::Error>` - Automatic I/O error conversion
 
 ### Serde Benefits
 With Serialize/Deserialize on all data structures:
@@ -197,6 +222,13 @@ edition = "2021"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
+
+# Format-specific parsing libraries
+csv = "1.3"           # CSV parsing with Read/Write support
+quick-xml = "0.31"    # XML parsing for CAMT.053 with Serde integration
+
+# Optional: serde_xml_rs as alternative for XML deserialization
+# serde-xml-rs = "0.6"
 ```
 
 **CLI (`ledger-bridge-cli/Cargo.toml`):**
@@ -221,169 +253,226 @@ clap = { version = "4.0", features = ["derive"] }
 - Module declarations
 
 #### `ledger-parser/src/model.rs`
-- Core data types: `Transaction`, `Statement`, etc.
-- Pure data structures
-- Implements: `Clone`, `Debug`, `PartialEq`
-- No parsing/formatting logic
+- Shared data types: `Transaction`, `TransactionType`, `BalanceType`
+- Pure data structures used across all formats
+- Implements: `Clone`, `Debug`, `PartialEq`, `Serialize`, `Deserialize`
 
 #### `ledger-parser/src/error.rs`
-- Custom error enums
+- Custom error enums (`ParseError`)
 - Implements `std::error::Error` and `std::fmt::Display`
-- Error types for parsing, formatting, conversion
-
-#### `ledger-parser/src/traits.rs`
-- `Parser<T>` trait - Generic parsing abstraction
-- `Formatter<T>` trait - Generic formatting abstraction
-- **Not tied to specific data types**
-- Work with any type satisfying trait bounds
+- Implements `From<std::io::Error>` for automatic conversion
 
 #### `ledger-parser/src/formats/*.rs`
-- One file per format (CSV, MT940, CAMT.053)
-- Both parser and formatter in same file
-- Implements traits for specific types
+- One file per format (csv.rs, mt940.rs, camt053.rs)
+- Each defines format-specific struct (CsvStatement, Mt940, Camt053)
+- Each implements:
+  - `from_read<R: Read>(&mut R) -> Result<Self, ParseError>` - Parsing
+  - `write_to<W: Write>(&mut W) -> Result<(), ParseError>` - Formatting
+  - `From<OtherFormat>` - Type conversions
 - Format-specific logic isolated
+- Uses external crates where appropriate (csv, quick-xml)
 
 ### Design Philosophy
-✅ **Separation of concerns**: data ↔ traits ↔ implementations  
-✅ **Trait-based abstraction**: Parsers work with any compatible type  
-✅ **Extensibility**: Add formats without touching existing code  
-✅ **KISS**: Flat structure, easy navigation  
+✅ **Separation of concerns**: shared types ↔ format-specific structs ↔ conversions  
+✅ **Standard library traits**: Read/Write for I/O, From for conversions  
+✅ **Format-specific types**: Each format has its own struct for type safety  
+✅ **Extensibility**: Add formats by implementing from_read/write_to methods  
+✅ **KISS**: Flat structure, easy navigation, straightforward implementation  
 
 ---
 
-## 4. Architecture & Traits
+## 4. Architecture & Design
 
-### Core Trait Design
+### Format-Specific Structures
 
-**Generic traits - not tied to specific data types**
-
-```rust
-use std::io::BufRead;
-
-/// Generic parser trait - works with ANY type T
-/// Requirement: Must read data using BufRead or Read traits
-pub trait Parser<T> {
-    type Error;
-    
-    /// Parse input from a BufRead reader into type T
-    /// This allows reading from files, stdin, or any buffered source
-    fn parse<R: BufRead>(&self, reader: R) -> Result<T, Self::Error>;
-}
-
-/// Generic formatter trait - works with ANY type T  
-pub trait Formatter<T> {
-    type Error;
-    
-    /// Format data of type T into string
-    fn format(&self, data: &T) -> Result<String, Self::Error>;
-}
-```
-
-**Why BufRead?**
-- Works with files, stdin, network streams, in-memory buffers
-- Enables efficient line-by-line reading for CSV and MT940
-- Reduces memory usage for large files
-- Standard Rust I/O pattern (learning focus)
-- Can be created from `Read` using `BufReader::new(reader)`
-
-### Unified Data Model Approach
-
-**Single `Statement` type** - All formats converge to this:
+**Each format has its own data structure** - No unified model:
 
 ```rust
-pub struct Statement {
-    pub account: String,
+use std::io::{Read, Write};
+
+/// MT940 SWIFT message structure
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Mt940 {
+    pub account_number: String,
+    pub currency: String,
+    pub opening_balance: f64,
+    pub opening_date: String,
+    pub opening_indicator: BalanceType,
+    pub closing_balance: f64,
+    pub closing_date: String,
+    pub closing_indicator: BalanceType,
     pub transactions: Vec<Transaction>,
-    // Common fields across all formats
 }
 
-pub struct Transaction {
-    pub date: String,          // ISO 8601
-    pub amount: f64,
-    pub description: String,
-    // Other common fields
+impl Mt940 {
+    /// Parse MT940 from any source implementing Read
+    pub fn from_read<R: Read>(reader: &mut R) -> Result<Self, ParseError> {
+        // Read data from reader
+        // Parse MT940 format
+        // Return Mt940 struct
+    }
+    
+    /// Write MT940 to any destination implementing Write
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<(), ParseError> {
+        // Format self as MT940
+        // Write to writer
+    }
 }
 ```
 
-### Parser Implementations
-
-**Zero-sized types** (empty structs):
+### CAMT.053 Structure
 
 ```rust
-pub struct CsvParser;
-pub struct Mt940Parser;
-pub struct Camt053Parser;
+/// ISO 20022 CAMT.053 XML structure
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Camt053 {
+    pub account_number: String,
+    pub currency: String,
+    pub opening_balance: f64,
+    pub opening_date: String,
+    pub opening_indicator: BalanceType,
+    pub closing_balance: f64,
+    pub closing_date: String,
+    pub closing_indicator: BalanceType,
+    pub transactions: Vec<Transaction>,
+}
 
-// All implement the same traits for Statement
-impl Parser<Statement> for CsvParser { 
-    type Error = ParseError;
+impl Camt053 {
+    /// Parse CAMT.053 from any source implementing Read
+    pub fn from_read<R: Read>(reader: &mut R) -> Result<Self, ParseError> {
+        // Use quick-xml to read and parse XML
+        // Return Camt053 struct
+    }
     
-    fn parse<R: BufRead>(&self, reader: R) -> Result<Statement, Self::Error> {
-        // Read line-by-line from BufRead
-        // Parse CSV format into Statement
+    /// Write CAMT.053 to any destination implementing Write
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<(), ParseError> {
+        // Use quick-xml to generate XML
+        // Write to writer
+    }
+}
+```
+
+### CSV Statement Structure
+
+```rust
+/// CSV bank statement structure
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CsvStatement {
+    pub account_number: String,
+    pub currency: String,
+    pub opening_balance: f64,
+    pub opening_date: String,
+    pub opening_indicator: BalanceType,
+    pub closing_balance: f64,
+    pub closing_date: String,
+    pub closing_indicator: BalanceType,
+    pub transactions: Vec<Transaction>,
+}
+
+impl CsvStatement {
+    /// Parse CSV from any source implementing Read
+    pub fn from_read<R: Read>(reader: &mut R) -> Result<Self, ParseError> {
+        // Use csv crate with Reader::from_reader(reader)
+        // Parse and return CsvStatement
+    }
+    
+    /// Write CSV to any destination implementing Write
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<(), ParseError> {
+        // Use csv crate with Writer::from_writer(writer)
+        // Write CSV data
+    }
+}
+```
+
+### Format Conversion using `From` Trait
+
+**Bidirectional conversions between formats:**
+
+```rust
+/// Convert MT940 to CAMT.053
+impl From<Mt940> for Camt053 {
+    fn from(mt940: Mt940) -> Self {
+        Camt053 {
+            account_number: mt940.account_number,
+            currency: mt940.currency,
+            opening_balance: mt940.opening_balance,
+            opening_date: mt940.opening_date,
+            opening_indicator: mt940.opening_indicator,
+            closing_balance: mt940.closing_balance,
+            closing_date: mt940.closing_date,
+            closing_indicator: mt940.closing_indicator,
+            transactions: mt940.transactions,
+        }
     }
 }
 
-impl Parser<Statement> for Mt940Parser { 
-    type Error = ParseError;
-    
-    fn parse<R: BufRead>(&self, reader: R) -> Result<Statement, Self::Error> {
-        // Read from BufRead (can read all or line-by-line)
-        // Parse MT940 format into Statement
+/// Convert CAMT.053 to MT940
+impl From<Camt053> for Mt940 {
+    fn from(camt: Camt053) -> Self {
+        Mt940 {
+            account_number: camt.account_number,
+            currency: camt.currency,
+            opening_balance: camt.opening_balance,
+            opening_date: camt.opening_date,
+            opening_indicator: camt.opening_indicator,
+            closing_balance: camt.closing_balance,
+            closing_date: camt.closing_date,
+            closing_indicator: camt.closing_indicator,
+            transactions: camt.transactions,
+        }
     }
 }
 
-impl Parser<Statement> for Camt053Parser { 
-    type Error = ParseError;
-    
-    fn parse<R: BufRead>(&self, reader: R) -> Result<Statement, Self::Error> {
-        // Read XML from BufRead
-        // Parse CAMT.053 format into Statement
-    }
-}
-
-impl Formatter<Statement> for CsvParser { ... }
-impl Formatter<Statement> for Mt940Parser { ... }
-impl Formatter<Statement> for Camt053Parser { ... }
+/// Similar implementations for CSV conversions
+impl From<Mt940> for CsvStatement { ... }
+impl From<CsvStatement> for Mt940 { ... }
+impl From<Camt053> for CsvStatement { ... }
+impl From<CsvStatement> for Camt053 { ... }
 ```
 
 ### Conversion Flow
 
 ```
-File/Stdin/BufRead (Input source)
+File/Stdin (Read source)
          ↓
-   Parser::parse(reader)
+   Format::from_read(&mut reader)
          ↓
-     Statement (unified type)
+     Mt940 / Camt053 / CsvStatement
          ↓
-   Formatter::format()
+   Into::<TargetFormat>::into()  [using From trait]
          ↓
-CSV/MT940/CAMT.053 (String output)
+     Target format struct
+         ↓
+   .write_to(&mut writer)
+         ↓
+File/Stdout (Write destination)
 ```
 
-**Format conversion**: Parse from format A (via BufRead) → Unified Statement → Format to B
-
-**Example:**
+**Format conversion example:**
 ```rust
-use std::io::BufReader;
 use std::fs::File;
+use std::io::{BufReader, BufWriter};
 
-// Read from file
-let file = File::open("input.csv")?;
-let reader = BufReader::new(file);
-let statement = CsvParser.parse(reader)?;
+// Read MT940 from file
+let mut file = File::open("input.mt940")?;
+let mt940 = Mt940::from_read(&mut file)?;
 
-// Convert to another format
-let output = Mt940Parser.format(&statement)?;
+// Convert to CAMT.053 using From trait
+let camt053: Camt053 = mt940.into();
+
+// Write to file
+let mut output = File::create("output.xml")?;
+camt053.write_to(&mut output)?;
 ```
 
 ### Key Benefits
-✅ **Generic traits**: Work with any type, not just Statement  
-✅ **Simple conversions**: No complex type mapping  
-✅ **Unified representation**: One data model for all formats  
-✅ **Extensible**: Add new formats without changing traits  
-✅ **BufRead-based parsing**: Memory-efficient, works with files/stdin/network/any byte source  
-✅ **Standard I/O patterns**: Learn idiomatic Rust I/O using std library traits  
+✅ **Read/Write traits**: Standard library abstractions for I/O  
+✅ **Format-specific structs**: Each format has its own representation  
+✅ **From trait conversions**: Idiomatic Rust type conversions  
+✅ **Static polymorphism**: Monomorphization ensures only used code is compiled  
+✅ **No runtime overhead**: Generic functions compiled to specific implementations  
+✅ **Extensible**: Add new formats by implementing from_read/write_to methods  
+✅ **Library agnostic**: Works with files, stdin, stdout, buffers, network streams  
 
 ---
 
@@ -391,12 +480,14 @@ let output = Mt940Parser.format(&statement)?;
 
 ### Core Data Structures
 
+**Format-specific structures** (Mt940, Camt053, CsvStatement) share the same field structure:
+
 ```rust
 use serde::{Deserialize, Serialize};
 
-/// Bank statement containing transactions and balances
+/// MT940 SWIFT message (example - similar structure for Camt053 and CsvStatement)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Statement {
+pub struct Mt940 {
     pub account_number: String,
     pub currency: String,              // "USD", "EUR", "DKK", "RUB", etc.
     
@@ -413,6 +504,21 @@ pub struct Statement {
     pub transactions: Vec<Transaction>,
 }
 
+impl Mt940 {
+    /// Parse from any Read source (file, stdin, buffer)
+    pub fn from_read<R: std::io::Read>(reader: &mut R) -> Result<Self, ParseError> {
+        // Implementation
+    }
+    
+    /// Write to any Write destination (file, stdout, buffer)
+    pub fn write_to<W: std::io::Write>(&self, writer: &mut W) -> Result<(), ParseError> {
+        // Implementation
+    }
+}
+
+// Similar structures for Camt053 and CsvStatement with identical fields
+// This enables seamless From trait conversions
+
 /// Balance type indicator (credit or debit position)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum BalanceType {
@@ -420,7 +526,7 @@ pub enum BalanceType {
     Debit,   // Negative balance (DBIT in CAMT, D in MT940)
 }
 
-/// Individual transaction entry
+/// Individual transaction entry (shared across all formats)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Transaction {
     pub booking_date: String,           // ISO 8601: "YYYY-MM-DD" (when booked)
@@ -440,6 +546,18 @@ pub enum TransactionType {
     Debit,   // Money paid (DBIT in CAMT, D in MT940)
 }
 ```
+
+### Design Rationale
+
+**Why separate structures with identical fields?**
+- Each format is a distinct type in the Rust type system
+- Enables type-safe conversions using `From` trait
+- Makes format origin explicit in function signatures
+- Allows format-specific methods and behavior
+- Demonstrates Rust's newtype pattern for domain modeling
+
+**Conversion between formats:**
+Since all three structures (Mt940, Camt053, CsvStatement) have identical fields, implementing `From` trait is straightforward field-by-field copying.
 
 ### Field Mapping Across Formats
 
@@ -750,21 +868,24 @@ impl From<std::io::Error> for ParseError {
 ### Usage Pattern
 
 ```rust
-use std::io::{BufRead, BufReader};
+use std::io::Read;
 
-// Both Parser and Formatter use ParseError
-impl Parser<Statement> for CsvParser {
-    type Error = ParseError;
-    
-    fn parse<R: BufRead>(&self, reader: R) -> Result<Statement, Self::Error> {
-        let mut lines = reader.lines();
+// Format structs implement from_read and use ParseError
+impl Mt940 {
+    pub fn from_read<R: Read>(reader: &mut R) -> Result<Self, ParseError> {
+        let mut content = String::new();
         
-        // Check if empty
-        let first_line = lines.next()
-            .ok_or(ParseError::CsvError("Empty input".to_string()))?
+        // Read all content
+        reader.read_to_string(&mut content)
             .map_err(|e| ParseError::IoError(e.to_string()))?;
         
-        // ... parsing logic using BufRead
+        // Check if empty
+        if content.is_empty() {
+            return Err(ParseError::Mt940Error("Empty input".to_string()));
+        }
+        
+        // ... parsing logic using content string
+        Ok(Mt940 { /* ... */ })
     }
 }
 ```
@@ -772,18 +893,18 @@ impl Parser<Statement> for CsvParser {
 ### CLI Error Handling
 
 ```rust
-use std::io::BufReader;
+use std::io::Read;
+use std::fs::File;
 
 // CLI displays errors and exits gracefully
 // Example: reading from file
-let file = File::open("input.csv").unwrap_or_else(|e| {
+let mut file = File::open("input.mt940").unwrap_or_else(|e| {
     eprintln!("Failed to open file: {}", e);
     std::process::exit(1);
 });
 
-let reader = BufReader::new(file);
-match parser.parse(reader) {
-    Ok(statement) => { /* process */ },
+match Mt940::from_read(&mut file) {
+    Ok(mt940) => { /* process */ },
     Err(e) => {
         eprintln!("Parse error: {}", e);
         std::process::exit(1);
@@ -821,42 +942,39 @@ ledger-parser/
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{Statement, Transaction};
-    use std::io::BufReader;
+    use crate::model::{CsvStatement, Transaction};
     
     #[test]
     fn test_parse_csv() {
         let input = "Account,Currency,...\nACC001,USD,...";
-        let reader = BufReader::new(input.as_bytes());
-        let parser = CsvParser;
-        let result = parser.parse(reader);
+        let mut reader = input.as_bytes();
+        let result = CsvStatement::from_read(&mut reader);
         assert!(result.is_ok());
     }
     
     #[test]
-    fn test_format_csv() {
-        let statement = Statement { /* ... */ };
-        let formatter = CsvParser;
-        let result = formatter.format(&statement);
+    fn test_write_csv() {
+        let statement = CsvStatement { /* ... */ };
+        let mut output = Vec::new();
+        let result = statement.write_to(&mut output);
         assert!(result.is_ok());
+        assert!(!output.is_empty());
     }
     
     #[test]
     fn test_parse_error() {
         let input = "";
-        let reader = BufReader::new(input.as_bytes());
-        let parser = CsvParser;
-        let result = parser.parse(reader);
+        let mut reader = input.as_bytes();
+        let result = CsvStatement::from_read(&mut reader);
         assert!(result.is_err());
     }
     
     #[test]
     fn test_parse_from_bytes() {
-        // BufRead works with any byte source
+        // Read works with any byte source
         let data: &[u8] = b"Account,Currency\nACC001,USD";
-        let reader = BufReader::new(data);
-        let parser = CsvParser;
-        let result = parser.parse(reader);
+        let mut reader = data;
+        let result = CsvStatement::from_read(&mut reader);
         assert!(result.is_ok());
     }
 }
@@ -867,35 +985,54 @@ mod tests {
 ```rust
 // tests/integration_test.rs
 use ledger_parser::*;
-use std::io::BufReader;
 
 #[test]
 fn test_csv_to_mt940_conversion() {
     let csv_input = "...";
-    let reader = BufReader::new(csv_input.as_bytes());
-    let statement = formats::CsvParser.parse(reader).unwrap();
-    let mt940_output = formats::Mt940Parser.format(&statement).unwrap();
-    assert!(!mt940_output.is_empty());
+    let mut reader = csv_input.as_bytes();
+    
+    // Parse CSV
+    let csv_statement = CsvStatement::from_read(&mut reader).unwrap();
+    
+    // Convert to MT940 using From trait
+    let mt940: Mt940 = csv_statement.into();
+    
+    // Write MT940
+    let mut output = Vec::new();
+    mt940.write_to(&mut output).unwrap();
+    assert!(!output.is_empty());
 }
 
 #[test]
 fn test_mt940_to_camt053_conversion() {
     let mt940_input = "...";
-    let reader = BufReader::new(mt940_input.as_bytes());
-    let statement = formats::Mt940Parser.parse(reader).unwrap();
-    let camt053_output = formats::Camt053Parser.format(&statement).unwrap();
-    assert!(!camt053_output.is_empty());
+    let mut reader = mt940_input.as_bytes();
+    
+    // Parse MT940
+    let mt940 = Mt940::from_read(&mut reader).unwrap();
+    
+    // Convert to CAMT.053 using From trait
+    let camt053: Camt053 = mt940.into();
+    
+    // Write CAMT.053
+    let mut output = Vec::new();
+    camt053.write_to(&mut output).unwrap();
+    assert!(!output.is_empty());
 }
 
 #[test]
 fn test_round_trip_conversion() {
-    // Test CSV -> Statement -> CSV
-    let original_csv = "...";
-    let reader = BufReader::new(original_csv.as_bytes());
-    let statement = formats::CsvParser.parse(reader).unwrap();
-    let output_csv = formats::CsvParser.format(&statement).unwrap();
-    // Validate output has expected structure
-    assert!(output_csv.contains("Account"));
+    // Test MT940 -> CAMT.053 -> MT940
+    let original_mt940 = "...";
+    let mut reader = original_mt940.as_bytes();
+    
+    let mt940_original = Mt940::from_read(&mut reader).unwrap();
+    let camt053: Camt053 = mt940_original.clone().into();
+    let mt940_converted: Mt940 = camt053.into();
+    
+    // Verify data integrity
+    assert_eq!(mt940_original.account_number, mt940_converted.account_number);
+    assert_eq!(mt940_original.currency, mt940_converted.currency);
 }
 ```
 
@@ -962,61 +1099,130 @@ struct Cli {
 ### Main Logic Flow
 
 ```rust
-use std::io::{self, BufReader, BufRead};
+use std::io::{self, Read, Write};
 use std::fs::File;
 
 fn main() {
     let cli = Cli::parse();
     
-    // 1. Create BufRead reader from input (file or stdin)
-    let reader: Box<dyn BufRead> = match &cli.input {
+    // 1. Create Read source (file or stdin)
+    let mut input: Box<dyn Read> = match &cli.input {
         Some(path) => {
             let file = File::open(path).unwrap_or_else(|e| {
                 eprintln!("Failed to open input file: {}", e);
                 std::process::exit(1);
             });
-            Box::new(BufReader::new(file))
+            Box::new(file)
         },
         None => {
             // Read from stdin
-            Box::new(BufReader::new(io::stdin()))
+            Box::new(io::stdin())
         }
     };
     
-    // 2. Select parser based on --in-format (case-insensitive) and parse using BufRead
-    let statement = match cli.in_format.to_lowercase().as_str() {
-        "csv" => CsvParser.parse(reader),
-        "mt940" => Mt940Parser.parse(reader),
-        "camt053" => Camt053Parser.parse(reader),
-        _ => { eprintln!("Unknown input format: {}", cli.in_format); std::process::exit(1); }
-    }.unwrap_or_else(|e| { 
-        eprintln!("Parse error: {}", e); 
-        std::process::exit(1); 
-    });
+    // 2. Parse based on --in-format (case-insensitive)
+    // Note: This is a simplified example. In practice, you'd need an enum or trait object
+    // to handle different return types. See implementation notes below.
+    let (mt940_opt, camt053_opt, csv_opt) = match cli.in_format.to_lowercase().as_str() {
+        "mt940" => {
+            let mt940 = Mt940::from_read(&mut input).unwrap_or_else(|e| {
+                eprintln!("Parse error: {}", e);
+                std::process::exit(1);
+            });
+            (Some(mt940), None, None)
+        },
+        "camt053" => {
+            let camt = Camt053::from_read(&mut input).unwrap_or_else(|e| {
+                eprintln!("Parse error: {}", e);
+                std::process::exit(1);
+            });
+            (None, Some(camt), None)
+        },
+        "csv" => {
+            let csv = CsvStatement::from_read(&mut input).unwrap_or_else(|e| {
+                eprintln!("Parse error: {}", e);
+                std::process::exit(1);
+            });
+            (None, None, Some(csv))
+        },
+        _ => {
+            eprintln!("Unknown input format: {}", cli.in_format);
+            std::process::exit(1);
+        }
+    };
     
-    // 3. Select formatter based on --out-format (case-insensitive)
-    let output = match cli.out_format.to_lowercase().as_str() {
-        "csv" => CsvParser.format(&statement),
-        "mt940" => Mt940Parser.format(&statement),
-        "camt053" => Camt053Parser.format(&statement),
-        _ => { eprintln!("Unknown output format: {}", cli.out_format); std::process::exit(1); }
-    }.unwrap_or_else(|e| { 
-        eprintln!("Format error: {}", e); 
-        std::process::exit(1); 
-    });
-    
-    // 4. Write output (file or stdout)
-    match &cli.output {
+    // 3. Create Write destination (file or stdout)
+    let mut output: Box<dyn Write> = match &cli.output {
         Some(path) => {
-            std::fs::write(path, output).unwrap_or_else(|e| {
-                eprintln!("Failed to write output file: {}", e);
+            let file = File::create(path).unwrap_or_else(|e| {
+                eprintln!("Failed to create output file: {}", e);
+                std::process::exit(1);
+            });
+            Box::new(file)
+        },
+        None => Box::new(io::stdout()),
+    };
+    
+    // 4. Convert and write based on --out-format
+    match cli.out_format.to_lowercase().as_str() {
+        "mt940" => {
+            let mt940 = if let Some(m) = mt940_opt {
+                m
+            } else if let Some(c) = camt053_opt {
+                c.into()
+            } else if let Some(csv) = csv_opt {
+                csv.into()
+            } else {
+                unreachable!()
+            };
+            mt940.write_to(&mut output).unwrap_or_else(|e| {
+                eprintln!("Write error: {}", e);
                 std::process::exit(1);
             });
         },
-        None => print!("{}", output),
+        "camt053" => {
+            let camt053 = if let Some(c) = camt053_opt {
+                c
+            } else if let Some(m) = mt940_opt {
+                m.into()
+            } else if let Some(csv) = csv_opt {
+                csv.into()
+            } else {
+                unreachable!()
+            };
+            camt053.write_to(&mut output).unwrap_or_else(|e| {
+                eprintln!("Write error: {}", e);
+                std::process::exit(1);
+            });
+        },
+        "csv" => {
+            let csv = if let Some(csv) = csv_opt {
+                csv
+            } else if let Some(m) = mt940_opt {
+                m.into()
+            } else if let Some(c) = camt053_opt {
+                c.into()
+            } else {
+                unreachable!()
+            };
+            csv.write_to(&mut output).unwrap_or_else(|e| {
+                eprintln!("Write error: {}", e);
+                std::process::exit(1);
+            });
+        },
+        _ => {
+            eprintln!("Unknown output format: {}", cli.out_format);
+            std::process::exit(1);
+        }
     }
 }
 ```
+
+**Implementation Note:** The above code can be simplified using an enum to hold any of the three format types, or by introducing a common trait. The key learning points are:
+1. **Read trait** enables reading from files or stdin without code duplication
+2. **Write trait** enables writing to files or stdout without code duplication
+3. **From trait** enables type-safe conversions between formats
+4. **Static dispatch** means no runtime overhead for generic code
 
 ### Error Handling
 
@@ -1040,46 +1246,74 @@ fn main() {
 
 ### Technical Vision Overview
 
-**Ledger Bridge** is designed as a learning-focused Rust project that demonstrates trait-based polymorphism through practical financial data parsing.
+**Ledger Bridge** is designed as a learning-focused Rust project that demonstrates **standard library I/O traits** (`Read`/`Write`) and **type conversions** (`From` trait) through practical financial data parsing.
 
-**Note:** This vision document has been refined based on analysis of real-world bank statement files:
-- **CAMT.053**: Danske Bank (Denmark) and Treasurease examples
-- **MT940**: Goldman Sachs, ASN Bank (Netherlands), and other international banks
-- **CSV**: Sberbank (Russia) with localized format
+**Note:** This vision document has been refined based on:
+1. Analysis of real-world bank statement files:
+   - **CAMT.053**: Danske Bank (Denmark) and Treasurease examples
+   - **MT940**: Goldman Sachs, ASN Bank (Netherlands), and other international banks
+   - **CSV**: Sberbank (Russia) with localized format
+2. Educational requirements emphasizing standard library trait usage
+3. Third-party library research for optimal parsing solutions
 
 All field mappings, format structures, and parsing strategies are based on actual production data.
 
 #### Key Design Decisions
 
-✅ **Minimal dependencies** - Only serde for data structures (optional helper libraries for parsing)  
-✅ **BufRead-based parsing** - All parsers use `std::io::BufRead` for efficient I/O  
-✅ **Unified data model** (single Statement type with Serialize/Deserialize)  
-✅ **Generic traits** (not tied to specific types)  
-✅ **Simple error handling** (one ParseError type)  
-✅ **Flexible parsing approaches** - Manual, serde, or combinatorial parsers (keep it simple)  
-✅ **Serde integration** - Data structures serializable for future extensibility  
-✅ **Minimal testing** (unit + integration)  
-✅ **Clean CLI** (clap for argument parsing)  
+✅ **Read/Write traits** - All parsers use `std::io::Read`, all formatters use `std::io::Write`  
+✅ **Format-specific structures** - Mt940, Camt053, CsvStatement (not unified model)  
+✅ **From trait conversions** - Idiomatic Rust type conversions between formats  
+✅ **Method-based API** - `from_read()` and `write_to()` methods on structs  
+✅ **Recommended libraries**:
+  - **csv** crate (Trust Score: 9.1) - CSV parsing with Read/Write support
+  - **quick-xml** crate (Trust Score: 9.2) - XML parsing with event-based API
+  - **Manual parsing** for MT940 - Educational value, demonstrates text processing
+✅ **Serde integration** - All data structures derive Serialize/Deserialize  
+✅ **Simple error handling** - One ParseError type  
+✅ **Static polymorphism** - Generic methods monomorphized at compile time  
+✅ **Clean CLI** - Demonstrates Read/Write abstraction benefits  
 ✅ **KISS principle** throughout
+
+#### Learning Objectives
+
+This project teaches:
+1. **Standard library I/O traits** - How `Read` and `Write` enable code reuse
+2. **Type conversions** - Implementing `From` trait for domain type conversions
+3. **Static polymorphism** - Generic functions without runtime overhead
+4. **Practical parsing** - Real-world financial data formats
+5. **Error handling** - Custom error types with `std::error::Error` trait
+6. **Third-party integration** - Using established crates effectively
 
 #### Project Deliverables
 
 1. **`ledger-parser` library** - Reusable parsing/formatting engine
+   - Mt940 struct with `from_read()` and `write_to()` methods
+   - Camt053 struct with `from_read()` and `write_to()` methods
+   - CsvStatement struct with `from_read()` and `write_to()` methods
+   - `From` trait implementations for all conversion pairs
+   - Shared Transaction and BalanceType types
+
 2. **`ledger-bridge-cli` binary** - Command-line conversion tool
+   - Reads from file or stdin (via `Read` trait)
+   - Writes to file or stdout (via `Write` trait)
+   - Converts between any supported formats
+   - Demonstrates standard library trait benefits
+
 3. **Documentation** - All public APIs documented
 4. **Tests** - Unit and integration test coverage
-5. **Format support** - CSV, MT940, CAMT.053
+5. **Format support** - CSV, MT940, CAMT.053 (bidirectional)
 
 #### Next Steps
 
 With this technical vision established, we're ready to:
 1. Set up the Cargo workspace
-2. Implement the data model
-3. Define traits
-4. Implement parsers/formatters
-5. Build the CLI
-6. Write tests
-7. Document the code
+2. Define shared types (Transaction, BalanceType, TransactionType)
+3. Implement format-specific structures (Mt940, Camt053, CsvStatement)
+4. Implement `from_read()` and `write_to()` methods
+5. Implement `From` trait conversions
+6. Build the CLI application
+7. Write tests
+8. Document the code
 
-This vision serves as our blueprint for development. All decisions prioritize simplicity and learning over production-grade features.
+This vision serves as our blueprint for development. All decisions prioritize **learning standard library patterns** and **idiomatic Rust** over production-grade features.
 
