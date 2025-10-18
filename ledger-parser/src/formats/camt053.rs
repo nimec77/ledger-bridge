@@ -1,7 +1,7 @@
 mod parser;
 mod elements;
 mod scratch;
-mod utils;
+mod camt053_utils;
 
 use parser::CamtParser;
 

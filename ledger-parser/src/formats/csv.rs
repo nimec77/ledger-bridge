@@ -173,15 +173,15 @@ impl CsvStatement {
         // Currency is in line 9 (index 8), look for "Российский рубль" or currency code
         let record = &records[8];
         for field in record.iter() {
-            let trimmed = field.trim();
-            if trimmed.contains("Российский рубль") || trimmed.contains("рубль")
+            let trimmed = field.trim().to_lowercase();
+            if trimmed.contains("российский рубль") || trimmed.contains("рубль")
             {
                 return Ok("RUB".into());
             }
-            if trimmed.contains("доллар") || trimmed.contains("USD") {
+            if trimmed.contains("доллар") || trimmed.contains("usd") {
                 return Ok("USD".into());
             }
-            if trimmed.contains("евро") || trimmed.contains("EUR") {
+            if trimmed.contains("евро") || trimmed.contains("eur") {
                 return Ok("EUR".into());
             }
         }
@@ -195,7 +195,10 @@ impl CsvStatement {
         // Transaction section starts after "Дата проводки" header (typically line 11-12)
         let mut transaction_start = None;
         for (i, record) in records.iter().enumerate() {
-            if record.iter().any(|f| f.contains("Дата проводки")) {
+            if record
+                .iter()
+                .any(|f| f.to_lowercase().contains("дата проводки"))
+            {
                 // Skip header row and sub-header row
                 transaction_start = Some(i + 2);
                 break;
@@ -209,7 +212,7 @@ impl CsvStatement {
         // Footer starts at "б/с" marker
         let mut footer_start = records.len();
         for (i, record) in records.iter().enumerate().skip(transaction_start) {
-            if record.iter().any(|f| f.contains("б/с")) {
+            if record.iter().any(|f| f.to_lowercase().contains("б/с")) {
                 footer_start = i;
                 break;
             }
@@ -330,7 +333,7 @@ impl CsvStatement {
         // Look for "Входящий остаток" in footer
         for record in &records[footer_start..] {
             for (i, field) in record.iter().enumerate() {
-                if field.contains("Входящий остаток") {
+                if field.to_lowercase().contains("входящий остаток") {
                     // Amount is typically a few columns later - skip zeros
                     for offset in 1..15 {
                         if let Some(amount_field) = record.get(i + offset) {
@@ -369,7 +372,7 @@ impl CsvStatement {
         // Look for "Исходящий остаток" in footer
         for record in &records[footer_start..] {
             for (i, field) in record.iter().enumerate() {
-                if field.contains("Исходящий остаток") {
+                if field.to_lowercase().contains("исходящий остаток") {
                     // Amount is typically a few columns later - skip zeros
                     for offset in 1..15 {
                         if let Some(amount_field) = record.get(i + offset) {
@@ -404,7 +407,7 @@ impl CsvStatement {
         for field in record.iter().rev() {
             let trimmed = field.trim();
             // Look for Russian date format like "01 января 2024 г."
-            if trimmed.contains("г.") && trimmed.len() > 10 {
+            if trimmed.to_lowercase().contains("г.") && trimmed.len() > 10 {
                 // Extract year
                 if let Some(year_pos) = trimmed.rfind(|c: char| c.is_ascii_digit()) {
                     let year_start = year_pos.saturating_sub(3);

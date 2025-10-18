@@ -7,7 +7,7 @@ use crate::model::{BalanceType, Transaction};
 
 use super::elements::ElementName;
 use super::scratch::{BalanceScratch, EntryScratch};
-use super::utils;
+use super::camt053_utils;
 
 #[derive(Default)]
 pub struct CamtParser {
@@ -204,9 +204,9 @@ impl CamtParser {
 
     fn finish_balance(&mut self) {
         if let Some(balance_type) = self.balance_scratch.balance_type.as_deref() {
-            match balance_type {
-                "OPBD" => self.apply_balance(BalanceKind::Opening),
-                "CLBD" => self.apply_balance(BalanceKind::Closing),
+            match balance_type.to_lowercase().as_str() {
+                "opbd" => self.apply_balance(BalanceKind::Opening),
+                "clbd" => self.apply_balance(BalanceKind::Closing),
                 _ => {}
             }
         }
@@ -215,7 +215,7 @@ impl CamtParser {
 
     fn apply_balance(&mut self, kind: BalanceKind) {
         if let Some(amount_text) = self.balance_scratch.amount.as_deref() {
-            if let Ok(amount) = utils::parse_amount(amount_text) {
+            if let Ok(amount) = camt053_utils::parse_amount(amount_text) {
                 match kind {
                     BalanceKind::Opening => self.opening_balance = Some(amount),
                     BalanceKind::Closing => self.closing_balance = Some(amount),
@@ -224,7 +224,7 @@ impl CamtParser {
         }
 
         if let Some(indicator_text) = self.balance_scratch.indicator.as_deref() {
-            if let Ok(indicator) = utils::parse_balance_indicator(indicator_text) {
+            if let Ok(indicator) = camt053_utils::parse_balance_indicator(indicator_text) {
                 match kind {
                     BalanceKind::Opening => self.opening_indicator = Some(indicator),
                     BalanceKind::Closing => self.closing_indicator = Some(indicator),
@@ -233,7 +233,7 @@ impl CamtParser {
         }
 
         if let Some(date_text) = self.balance_scratch.date.as_deref() {
-            if let Ok(date) = utils::parse_xml_date(date_text) {
+            if let Ok(date) = camt053_utils::parse_xml_date(date_text) {
                 match kind {
                     BalanceKind::Opening => self.opening_date = Some(date),
                     BalanceKind::Closing => self.closing_date = Some(date),
@@ -258,7 +258,13 @@ impl CamtParser {
         for attr in attributes {
             let attr = attr
                 .map_err(|err| ParseError::Camt053Error(format!("XML attribute error: {}", err)))?;
-            if attr.key.as_ref() == b"Ccy" {
+            
+            // Convert attribute key to lowercase for case-insensitive comparison
+            let key_str = std::str::from_utf8(attr.key.as_ref()).map_err(|err| {
+                ParseError::Camt053Error(format!("Invalid attribute key encoding: {}", err))
+            })?;
+            
+            if key_str.to_lowercase() == "ccy" {
                 let value = String::from_utf8(attr.value.as_ref().to_vec()).map_err(|err| {
                     ParseError::Camt053Error(format!("Invalid currency encoding: {}", err))
                 })?;

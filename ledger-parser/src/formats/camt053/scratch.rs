@@ -1,7 +1,7 @@
 use crate::error::ParseError;
 use crate::model::Transaction;
 
-use super::utils;
+use super::camt053_utils;
 
 #[derive(Default)]
 pub struct BalanceScratch {
@@ -51,7 +51,7 @@ impl EntryScratch {
         let amount = match self
             .amount
             .as_deref()
-            .and_then(|value| utils::parse_amount(value).ok())
+            .and_then(|value| camt053_utils::parse_amount(value).ok())
         {
             Some(value) => value,
             None => return Ok(None),
@@ -60,7 +60,7 @@ impl EntryScratch {
         let transaction_type = match self
             .indicator
             .as_deref()
-            .and_then(|value| utils::parse_transaction_type(value).ok())
+            .and_then(|value| camt053_utils::parse_transaction_type(value).ok())
         {
             Some(value) => value,
             None => return Ok(None),
@@ -69,7 +69,7 @@ impl EntryScratch {
         let booking_date = match self
             .booking_date
             .as_deref()
-            .and_then(|value| utils::parse_xml_date(value).ok())
+            .and_then(|value| camt053_utils::parse_xml_date(value).ok())
         {
             Some(value) => value,
             None => return Ok(None),
