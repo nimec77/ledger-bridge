@@ -260,15 +260,15 @@ impl CsvStatement {
         if date_str.is_empty() {
             return Err(ParseError::CsvError("Empty date field".to_string()));
         }
-        let booking_date = utils::parse_date(&date_str)?;
+        let booking_date = Self::parse_date(&date_str)?;
 
         // Extract debit amount (column 9, around index 9)
         let debit_str = get_field(9);
-        let debit_amount = Self::parse_russian_amount(&debit_str)?;
+        let debit_amount = Self::parse_amount(&debit_str)?;
 
         // Extract credit amount (column 13, around index 13)
         let credit_str = get_field(13);
-        let credit_amount = Self::parse_russian_amount(&credit_str)?;
+        let credit_amount = Self::parse_amount(&credit_str)?;
 
         // Determine transaction type and amount
         let (amount, transaction_type) = if debit_amount > 0.0 {
@@ -311,8 +311,14 @@ impl CsvStatement {
         })
     }
 
-    /// Parse Russian amount format (comma as decimal separator)
-    fn parse_russian_amount(amount_str: &str) -> Result<f64, ParseError> {
+    /// Parse date format (comma as decimal separator)
+    fn parse_date(date_str: &str) -> Result<DateTime<FixedOffset>, ParseError> {
+        utils::parse_date(date_str)
+            .map_err(|_| ParseError::CsvError(format!("Invalid date: {}", date_str)))
+    }
+
+    /// Parse amount format (comma as decimal separator)
+    fn parse_amount(amount_str: &str) -> Result<f64, ParseError> {
         let trimmed = amount_str.trim();
         if trimmed.is_empty() {
             return Ok(0.0);
@@ -338,7 +344,7 @@ impl CsvStatement {
                     // Amount is typically a few columns later - skip zeros
                     for offset in 1..15 {
                         if let Some(amount_field) = record.get(i + offset) {
-                            if let Ok(amount) = Self::parse_russian_amount(amount_field) {
+                            if let Ok(amount) = Self::parse_amount(amount_field) {
                                 // Skip zero amounts - find the actual balance
                                 if amount.abs() < 0.01 {
                                     continue;
@@ -352,7 +358,7 @@ impl CsvStatement {
 
                                 // Try to extract date (often at end of row)
                                 let date =
-                                    utils::parse_date(&Self::extract_date_from_record(record)?)?;
+                                    Self::parse_date(&Self::extract_date_from_record(record)?)?;
 
                                 return Ok((amount.abs(), date, indicator));
                             }
@@ -379,7 +385,7 @@ impl CsvStatement {
                     // Amount is typically a few columns later - skip zeros
                     for offset in 1..15 {
                         if let Some(amount_field) = record.get(i + offset) {
-                            if let Ok(amount) = Self::parse_russian_amount(amount_field) {
+                            if let Ok(amount) = Self::parse_amount(amount_field) {
                                 // Skip zero amounts - find the actual balance
                                 if amount.abs() < 0.01 {
                                     continue;
@@ -396,7 +402,7 @@ impl CsvStatement {
 
                                 return Ok((
                                     amount.abs(),
-                                    utils::parse_date(&date_str)?,
+                                    Self::parse_date(&date_str)?,
                                     indicator,
                                 ));
                             }
@@ -620,35 +626,35 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_russian_date() {
-        let result = utils::parse_date("20.02.2024");
+    fn test_parse_date() {
+        let result = CsvStatement::parse_date("20.02.2024");
         assert!(result.is_ok());
         assert_eq!(result.unwrap().format("%d.%m.%Y").to_string(), "20.02.2024");
     }
 
     #[test]
-    fn test_parse_russian_amount() {
-        let result = CsvStatement::parse_russian_amount("1540,00");
+    fn test_parse_amount() {
+        let result = CsvStatement::parse_amount("1540,00");
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 1540.0);
     }
 
     #[test]
     fn test_parse_empty_amount() {
-        let result = CsvStatement::parse_russian_amount("");
+        let result = CsvStatement::parse_amount("");
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 0.0);
     }
 
     #[test]
     fn test_parse_invalid_date() {
-        let result = utils::parse_date("invalid");
+        let result = CsvStatement::parse_date("invalid");
         assert!(result.is_err());
     }
 
     #[test]
     fn test_parse_invalid_amount() {
-        let result = CsvStatement::parse_russian_amount("invalid");
+        let result = CsvStatement::parse_amount("invalid");
         assert!(result.is_err());
     }
 
@@ -666,10 +672,10 @@ mod tests {
             account_number: "40702810440000030888".to_string(),
             currency: "RUB".to_string(),
             opening_balance: 1332.54,
-            opening_date: utils::parse_date("2024-01-01").unwrap(),
+            opening_date: CsvStatement::parse_date("2024-01-01").unwrap(),
             opening_indicator: BalanceType::Credit,
             closing_balance: 5975.04,
-            closing_date: utils::parse_date("2024-12-31").unwrap(),
+            closing_date: CsvStatement::parse_date("2024-12-31").unwrap(),
             closing_indicator: BalanceType::Credit,
             transactions: vec![],
         };
