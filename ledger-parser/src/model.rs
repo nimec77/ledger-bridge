@@ -3,26 +3,26 @@ use serde::{Deserialize, Serialize};
 /// Balance type indicator (credit or debit position)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum BalanceType {
-    Credit,  // Positive balance (CRDT in CAMT, C in MT940)
-    Debit,   // Negative balance (DBIT in CAMT, D in MT940)
+    Credit, // Positive balance (CRDT in CAMT, C in MT940)
+    Debit,  // Negative balance (DBIT in CAMT, D in MT940)
 }
 
 /// Transaction type (credit/debit indicator)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum TransactionType {
-    Credit,  // Money received (CRDT in CAMT, C in MT940)
-    Debit,   // Money paid (DBIT in CAMT, D in MT940)
+    Credit, // Money received (CRDT in CAMT, C in MT940)
+    Debit,  // Money paid (DBIT in CAMT, D in MT940)
 }
 
 /// Individual transaction entry (shared across all formats)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Transaction {
-    pub booking_date: String,           // ISO 8601: "YYYY-MM-DD" (when booked)
-    pub value_date: Option<String>,     // ISO 8601: "YYYY-MM-DD" (value date, optional)
-    pub amount: f64,                    // Always positive number
+    pub booking_date: String,       // ISO 8601: "YYYY-MM-DD" (when booked)
+    pub value_date: Option<String>, // ISO 8601: "YYYY-MM-DD" (value date, optional)
+    pub amount: f64,                // Always positive number
     pub transaction_type: TransactionType, // Credit or Debit
-    pub description: String,            // Transaction description/narrative
-    pub reference: Option<String>,      // Optional reference/transaction ID
+    pub description: String,        // Transaction description/narrative
+    pub reference: Option<String>,  // Optional reference/transaction ID
     pub counterparty_name: Option<String>, // Debtor/Creditor name
     pub counterparty_account: Option<String>, // Counterparty account/IBAN
 }
@@ -77,7 +77,7 @@ mod tests {
             counterparty_name: None,
             counterparty_account: None,
         };
-        
+
         // Test that it can be serialized and deserialized
         let serialized = serde_json::to_string(&tx).unwrap();
         let deserialized: Transaction = serde_json::from_str(&serialized).unwrap();

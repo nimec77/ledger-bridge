@@ -10,7 +10,7 @@
 |-----------|--------|-------|-------|-----------------|
 | **Iteration 0** | ✅ Complete | 2/2 | Setup | Workspace builds |
 | **Iteration 1** | ✅ Complete | 3/3 | Foundation | Core types compile |
-| **Iteration 2** | 🔄 In Progress | 1/4 | CSV | Parse & write CSV |
+| **Iteration 2** | ✅ Complete | 4/4 | CSV | Parse & write CSV |
 | **Iteration 3** | ⏳ Pending | 0/4 | MT940 | Parse & write MT940 |
 | **Iteration 4** | ⏳ Pending | 0/4 | CAMT.053 | Parse & write XML |
 | **Iteration 5** | ⏳ Pending | 0/3 | Conversions | From trait works |
@@ -19,7 +19,7 @@
 
 **Legend:** ⏳ Pending | 🔄 In Progress | ✅ Complete | ❌ Blocked
 
-**Overall Progress:** 6/25 tasks complete (24%)
+**Overall Progress:** 9/25 tasks complete (36%)
 
 ---
 
@@ -81,9 +81,9 @@ fn test_transaction_creation() {
 
 ### Tasks
 - [x] **2.1** Create `formats/csv.rs` with `CsvStatement` struct (identical fields to future Mt940/Camt053)
-- [ ] **2.2** Implement `CsvStatement::from_read<R: Read>()`  using `csv` crate
-- [ ] **2.3** Implement `CsvStatement::write_to<W: Write>()` using `csv` crate
-- [ ] **2.4** Add unit tests (parse, write, error cases)
+- [x] **2.2** Implement `CsvStatement::from_read<R: Read>()`  using `csv` crate
+- [x] **2.3** Implement `CsvStatement::write_to<W: Write>()` using `csv` crate
+- [x] **2.4** Add unit tests (parse, write, error cases)
 
 **Test Command:**
 ```bash
