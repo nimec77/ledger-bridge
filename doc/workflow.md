@@ -1,43 +1,59 @@
 # Development Workflow - Ledger Bridge
 
-> Instructions for code assistants working on this project
+> Instructions for code assistants working on [@tasklist.md](tasklist.md) using [@vision.md](../vision.md)
 
 ---
 
 ## Workflow Rules
 
 ### 1. Before Starting Work
-- Read current task from `doc/tasklist.md`
-- Understand requirements from `vision.md` and `conventions.md`
-- Identify the current phase and subtask
+- Read current iteration from [@tasklist.md](tasklist.md)
+- Review requirements from [@vision.md](../vision.md) and [@conventions.md](../conventions.md)
+- Identify which tasks in the iteration are pending
+- Check the testable output criteria for the iteration
 
 ### 2. Propose Solution
 **BEFORE any implementation:**
 - Present proposed approach with code snippets
-- Show key function signatures and data structures
+- Show key struct definitions and method signatures
 - Explain design decisions
-- **Wait for user agreement**
+- Reference relevant sections from vision.md/conventions.md
+- **Wait for user approval**
 
 Example:
 ```
-I propose implementing CsvParser with:
+📋 Iteration 2, Task 2.1: Create CsvStatement struct
 
-struct CsvParser;
+🎯 Approach:
+Define CsvStatement with fields identical to Mt940/Camt053 for simple From trait conversions.
 
-impl Parser<Statement> for CsvParser {
-    type Error = ParseError;
-    fn parse<R: BufRead>(&self, reader: R) -> Result<Statement, Self::Error> {
-        // Parse line by line
-        // Skip headers
-        // Extract transactions
+💻 Code Structure:
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CsvStatement {
+    pub account_number: String,
+    pub currency: String,
+    pub opening_balance: f64,
+    pub opening_date: String,
+    pub opening_indicator: BalanceType,
+    pub closing_balance: f64,
+    pub closing_date: String,
+    pub closing_indicator: BalanceType,
+    pub transactions: Vec<Transaction>,
+}
+
+impl CsvStatement {
+    pub fn from_read<R: std::io::Read>(reader: &mut R) -> Result<Self, ParseError> {
+        // Use csv::Reader::from_reader()
+        // Parse with Serde deserialize
+    }
+    
+    pub fn write_to<W: std::io::Write>(&self, writer: &mut W) -> Result<(), ParseError> {
+        // Use csv::Writer::from_writer()
+        // Write with Serde serialize
     }
 }
 
-Helper functions:
-- parse_amount(s: &str) -> Result<f64>
-- parse_date(s: &str) -> Result<String>
-
-Agree to proceed?
+❓ Agree to proceed with this structure?
 ```
 
 ### 3. Implement After Agreement
@@ -53,29 +69,33 @@ Agree to proceed?
 - Run `cargo fmt` (format code)
 
 ### 5. Update Progress
-Update `doc/tasklist.md`:
-- Mark completed subtasks: `- [x]`
-- Update phase progress counters
-- Update status: ⏳ → 🔄 → ✅
+Update [@tasklist.md](tasklist.md):
+- Mark completed tasks: `- [x]` → `- [X]` (capital X)
+- Update iteration task counters (e.g., "0/4" → "1/4")
+- Update iteration status when starting: ⏳ → 🔄
+- Update iteration status when complete: 🔄 → ✅
+- Update overall progress percentage
 
 ### 6. Wait for Confirmation
 - Present what was completed
 - Show test results
 - **Wait for user to confirm** before proceeding
 
-### 7. Commit Changes
-After user confirmation:
+### 7. Commit Changes (Optional)
+After user confirmation, if requested:
 ```bash
 git add .
-git commit -m "Phase X.Y: [Description]
+git commit -m "Iteration X, Task X.Y: [Description]
 
 - Implemented [feature]
 - Added tests for [functionality]
+- Tests passing: build, test, clippy
 - Updated tasklist progress"
 ```
 
 ### 8. Move to Next Task
-- Get explicit agreement to proceed to next subtask
+- Complete all tasks in current iteration before moving to next
+- Get explicit agreement to proceed to next task/iteration
 - Return to step 1
 
 ---
@@ -144,35 +164,37 @@ git commit -m "Phase X.Y: [Description]
 
 ### When Proposing
 ```
-📋 Task: [Phase X.Y - Task name]
+📋 Iteration X, Task X.Y: [Task name]
 
 🎯 Approach:
-[Brief explanation]
+[Brief explanation of what will be implemented]
 
 💻 Code Structure:
-[Key signatures and snippets]
+[Key struct definitions, method signatures, snippets]
 
 🧪 Tests:
-[What will be tested]
+[What will be tested and how]
 
-❓ Ready to proceed?
+❓ Agree to proceed?
 ```
 
 ### When Complete
 ```
-✅ Completed: [Phase X.Y - Task name]
+✅ Completed: Iteration X, Task X.Y - [Task name]
 
 📝 Changes:
-- [List of changes]
+- [List of files created/modified]
+- [List of functionality added]
 
-🧪 Tests:
+🧪 Test Results:
 ✓ cargo build: PASS
-✓ cargo test: PASS
-✓ cargo clippy: PASS
+✓ cargo test: PASS (X tests)
+✓ cargo clippy: PASS (no warnings)
+✓ cargo fmt: Code formatted
 
-📊 Updated tasklist progress
+📊 Progress: Updated tasklist (Iteration X: Y/Z tasks complete)
 
-⏸️  Awaiting confirmation to commit
+⏸️  Awaiting confirmation to proceed
 ```
 
 ---
@@ -181,23 +203,41 @@ git commit -m "Phase X.Y: [Description]
 
 **Assistant:**
 ```
-📋 Task: Phase 0.1 - Workspace Setup
+📋 Iteration 0, Task 0.1: Create Cargo workspace
 
 🎯 Approach:
-Create Cargo workspace with two crates using workspace.members
+Create Cargo workspace with two crates: ledger-parser (library) and ledger-bridge-cli (binary).
+Add required dependencies: serde, csv, quick-xml for library; clap for CLI.
 
 💻 Structure:
 Cargo.toml (workspace root):
 [workspace]
 members = ["ledger-parser", "ledger-bridge-cli"]
+resolver = "2"
 
 ledger-parser/Cargo.toml:
 [package]
 name = "ledger-parser"
+edition = "2021"
+
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
+csv = "1.3"
+quick-xml = "0.31"
 
-❓ Agree to create this structure?
+ledger-bridge-cli/Cargo.toml:
+[package]
+name = "ledger-bridge-cli"
+edition = "2021"
+
+[dependencies]
+ledger-parser = { path = "../ledger-parser" }
+clap = { version = "4.0", features = ["derive"] }
+
+🧪 Tests:
+Run `cargo build` to verify workspace structure
+
+❓ Agree to proceed?
 ```
 
 **User:** "Yes, proceed"
@@ -206,32 +246,57 @@ serde = { version = "1.0", features = ["derive"] }
 ```
 [Creates files, runs tests]
 
-✅ Completed: Phase 0.1 - Workspace Setup
+✅ Completed: Iteration 0, Task 0.1 - Workspace Setup
 
 📝 Changes:
-- Created workspace Cargo.toml
-- Created ledger-parser crate
-- Created ledger-bridge-cli crate
-- Added dependencies
+- Created Cargo.toml (workspace root)
+- Created ledger-parser/ crate with Cargo.toml and src/lib.rs
+- Created ledger-bridge-cli/ crate with Cargo.toml and src/main.rs
+- Added all required dependencies
 
-🧪 Tests:
-✓ cargo build: PASS
+🧪 Test Results:
+✓ cargo build: PASS (compiles both crates)
 
-📊 Updated tasklist (Phase 0: 1/3 complete)
+📊 Progress: Updated tasklist (Iteration 0: 1/2 tasks complete)
 
-⏸️  Awaiting confirmation to commit
+⏸️  Awaiting confirmation to proceed to Task 0.2
 ```
 
-**User:** "Good, commit it"
+**User:** "Good, continue to next task"
 
 **Assistant:**
 ```
-[Commits changes]
-
-✅ Committed: "Phase 0.1: Workspace Setup"
-
-Ready for Phase 0.2?
+📋 Iteration 0, Task 0.2: [Next task proposal...]
 ```
+
+---
+
+## Iteration Completion
+
+### Before Moving to Next Iteration
+Each iteration has specific **Testable Output** criteria in [@tasklist.md](tasklist.md).
+
+**Verify all criteria met:**
+- [ ] All tasks in iteration completed and checked
+- [ ] Test command from tasklist runs successfully
+- [ ] Expected functionality demonstrated
+- [ ] Progress table updated (status, task count, percentage)
+- [ ] User confirms iteration complete
+
+**Example from Iteration 2 (CSV):**
+```
+Testable: Parse CSV, write CSV, round-trip works
+
+Must demonstrate:
+1. Parse a CSV string into CsvStatement
+2. Write CsvStatement back to CSV format
+3. Round-trip: CSV → CsvStatement → CSV (data preserved)
+```
+
+Only proceed to next iteration after:
+✅ All tests passing
+✅ Functionality demonstrated
+✅ User approval received
 
 ---
 
@@ -239,10 +304,17 @@ Ready for Phase 0.2?
 
 | Checkpoint | Action | Wait? |
 |------------|--------|-------|
-| Before coding | Propose solution | ✋ YES |
-| After implementation | Show results | ✋ YES |
-| Before commit | Get confirmation | ✋ YES |
-| Before next task | Get go-ahead | ✋ YES |
+| Before coding | Propose solution with code snippets | ✋ YES |
+| After implementation | Show test results | ✋ YES |
+| Before next task | Get approval | ✋ YES |
+| Before next iteration | Verify all criteria + get approval | ✋ YES |
+
+### Key Principles
+- **Propose first** - Always show code before implementing
+- **Test everything** - build, test, clippy must pass
+- **Update progress** - Keep tasklist.md current
+- **Wait at checkpoints** - Don't skip ahead without approval
+- **One iteration at a time** - Complete fully before moving on
 
 **Remember:** KISS principle - Keep workflows simple and effective.
 
