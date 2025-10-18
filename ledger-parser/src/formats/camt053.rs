@@ -1,5 +1,6 @@
 use chrono::{DateTime, FixedOffset};
-use quick_xml::events::Event;
+use quick_xml::events::attributes::Attributes;
+use quick_xml::events::{BytesEnd, BytesStart, Event};
 use quick_xml::Reader;
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
@@ -52,207 +53,28 @@ impl Camt053 {
         let mut xml_reader = Reader::from_str(&content);
         xml_reader.config_mut().trim_text(true);
 
-        // State variables for parsing
-        let mut account_number = String::new();
-        let mut currency = String::new();
-        let mut opening_balance: Option<f64> = None;
-        let mut opening_date: Option<DateTime<FixedOffset>> = None;
-        let mut opening_indicator: Option<BalanceType> = None;
-        let mut closing_balance: Option<f64> = None;
-        let mut closing_date: Option<DateTime<FixedOffset>> = None;
-        let mut closing_indicator: Option<BalanceType> = None;
-        let mut transactions: Vec<Transaction> = Vec::new();
-
-        // Temporary state for current element parsing
-        let mut current_path: Vec<String> = Vec::new();
-        let mut current_balance_type = String::new();
-        let mut current_balance_amount = String::new();
-        let mut current_balance_indicator = String::new();
-        let mut current_balance_date = String::new();
-
-        // Entry (transaction) state
-        let mut in_entry = false;
-        let mut entry_amount = String::new();
-        let mut entry_type = String::new();
-        let mut entry_booking_date = String::new();
-        let mut entry_value_date = String::new();
-        let mut entry_reference = String::new();
-        let mut entry_description = String::new();
-        let mut entry_counterparty_name = String::new();
-        let mut entry_counterparty_account = String::new();
-
+        let mut parser = CamtParser::default();
         let mut buf = Vec::new();
 
         loop {
             match xml_reader.read_event_into(&mut buf) {
-                Ok(Event::Start(e)) => {
-                    let name = String::from_utf8_lossy(e.name().as_ref()).to_string();
-                    current_path.push(name.clone());
-
-                    // Extract currency from Amt attribute
-                    if name == "Amt" {
-                        for attr in e.attributes().flatten() {
-                            if attr.key.as_ref() == b"Ccy" {
-                                let ccy = String::from_utf8_lossy(&attr.value).to_string();
-                                if currency.is_empty() {
-                                    currency = ccy;
-                                }
-                            }
-                        }
-                    }
-
-                    if name == "Ntry" {
-                        in_entry = true;
-                        // Reset entry state
-                        entry_amount.clear();
-                        entry_type.clear();
-                        entry_booking_date.clear();
-                        entry_value_date.clear();
-                        entry_reference.clear();
-                        entry_description.clear();
-                        entry_counterparty_name.clear();
-                        entry_counterparty_account.clear();
-                    }
-                }
-                Ok(Event::End(e)) => {
-                    let name = String::from_utf8_lossy(e.name().as_ref()).to_string();
-
-                    // Process balance when </Bal> is reached
-                    if name == "Bal" && !current_balance_type.is_empty() {
-                        if current_balance_type == "OPBD" {
-                            opening_balance = Self::parse_amount(&current_balance_amount).ok();
-                            opening_indicator =
-                                Self::parse_balance_indicator(&current_balance_indicator).ok();
-                            opening_date = Self::parse_xml_date(&current_balance_date).ok();
-                        } else if current_balance_type == "CLBD" {
-                            closing_balance = Self::parse_amount(&current_balance_amount).ok();
-                            closing_indicator =
-                                Self::parse_balance_indicator(&current_balance_indicator).ok();
-                            closing_date = Self::parse_xml_date(&current_balance_date).ok();
-                        }
-                        // Clear balance state
-                        current_balance_type.clear();
-                        current_balance_amount.clear();
-                        current_balance_indicator.clear();
-                        current_balance_date.clear();
-                    }
-
-                    // Process entry when </Ntry> is reached
-                    if name == "Ntry" && in_entry {
-                        if let (Ok(amount), Ok(tx_type), Ok(booking_date)) = (
-                            Self::parse_amount(&entry_amount),
-                            Self::parse_transaction_type(&entry_type),
-                            Self::parse_xml_date(&entry_booking_date),
-                        ) {
-                            let transaction = Transaction {
-                                booking_date,
-                                value_date: if entry_value_date.is_empty() {
-                                    None
-                                } else {
-                                    Some(entry_value_date.clone())
-                                },
-                                amount,
-                                transaction_type: tx_type,
-                                description: entry_description.clone(),
-                                reference: if entry_reference.is_empty() {
-                                    None
-                                } else {
-                                    Some(entry_reference.clone())
-                                },
-                                counterparty_name: if entry_counterparty_name.is_empty() {
-                                    None
-                                } else {
-                                    Some(entry_counterparty_name.clone())
-                                },
-                                counterparty_account: if entry_counterparty_account.is_empty() {
-                                    None
-                                } else {
-                                    Some(entry_counterparty_account.clone())
-                                },
-                            };
-                            transactions.push(transaction);
-                        }
-                        in_entry = false;
-                    }
-
-                    if !current_path.is_empty() {
-                        current_path.pop();
-                    }
-                }
+                Ok(Event::Start(e)) => parser.handle_start(&e)?,
+                Ok(Event::End(e)) => parser.handle_end(&e)?,
                 Ok(Event::Text(e)) => {
-                    let text = String::from_utf8_lossy(e.as_ref()).trim().to_string();
-                    if text.is_empty() {
-                        continue;
-                    }
-
-                    let path_str = current_path.join("/");
-
-                    // Account number (from Stmt/Acct, not from transaction parties)
-                    if path_str.ends_with("Stmt/Acct/Id/IBAN")
-                        || (path_str.ends_with("Stmt/Acct/Id/Othr/Id") && account_number.is_empty())
-                    {
-                        account_number = text;
-                    }
-                    // Currency (also from Acct)
-                    else if path_str.ends_with("Acct/Ccy") {
-                        currency = text;
-                    }
-                    // Balance parsing
-                    else if path_str.ends_with("Bal/Tp/CdOrPrtry/Cd") {
-                        current_balance_type = text;
-                    } else if path_str.ends_with("Bal/Amt") {
-                        current_balance_amount = text;
-                    } else if path_str.ends_with("Bal/CdtDbtInd") {
-                        current_balance_indicator = text;
-                    } else if path_str.ends_with("Bal/Dt/Dt") {
-                        current_balance_date = text;
-                    }
-                    // Entry/Transaction parsing
-                    else if in_entry {
-                        if path_str.ends_with("Ntry/Amt") {
-                            entry_amount = text;
-                        } else if path_str.ends_with("Ntry/CdtDbtInd") {
-                            entry_type = text;
-                        } else if path_str.ends_with("Ntry/BookgDt/Dt") {
-                            entry_booking_date = text;
-                        } else if path_str.ends_with("Ntry/ValDt/Dt") {
-                            entry_value_date = text;
-                        } else if path_str.ends_with("Ntry/NtryRef") {
-                            entry_reference = text.clone();
-                        } else if path_str.contains("TxDtls") && path_str.ends_with("Refs/TxId") {
-                            // TxId takes precedence, but NtryRef is a fallback
-                            entry_reference = text.clone();
-                        } else if path_str.ends_with("NtryDtls/TxDtls/RmtInf/Ustrd") {
-                            if !entry_description.is_empty() {
-                                entry_description.push(' ');
-                            }
-                            entry_description.push_str(&text);
-                        } else if path_str.ends_with("NtryDtls/TxDtls/RmtInf/Strd/CdtrRefInf/Ref") {
-                            if entry_description.is_empty() {
-                                entry_description = text;
-                            }
-                        } else if path_str.contains("RltdPties") && path_str.ends_with("Dbtr/Nm") {
-                            entry_counterparty_name = text;
-                        } else if path_str.contains("RltdPties") && path_str.ends_with("Cdtr/Nm") {
-                            if entry_counterparty_name.is_empty() {
-                                entry_counterparty_name = text;
-                            }
-                        } else if (path_str.contains("DbtrAcct") && path_str.ends_with("Id/IBAN"))
-                            || (entry_counterparty_account.is_empty()
-                                && ((path_str.contains("CdtrAcct")
-                                    && path_str.ends_with("Id/IBAN"))
-                                    || (path_str.contains("DbtrAcct")
-                                        && path_str.ends_with("Id/Othr/Id"))
-                                    || (path_str.contains("CdtrAcct")
-                                        && path_str.ends_with("Id/Othr/Id"))))
-                        {
-                            entry_counterparty_account = text.clone();
-                        } else if path_str.ends_with("AddtlTxInf") {
-                            if !entry_description.is_empty() {
-                                entry_description.push(' ');
-                            }
-                            entry_description.push_str(&text);
+                    let bytes = e.as_ref();
+                    if !bytes.is_empty() {
+                        let decoded = String::from_utf8_lossy(bytes);
+                        let trimmed = decoded.trim();
+                        if !trimmed.is_empty() {
+                            parser.handle_text(trimmed)?;
                         }
+                    }
+                }
+                Ok(Event::CData(e)) => {
+                    let text = String::from_utf8_lossy(e.as_ref());
+                    let trimmed = text.trim();
+                    if !trimmed.is_empty() {
+                        parser.handle_text(trimmed)?;
                     }
                 }
                 Ok(Event::Eof) => break,
@@ -262,29 +84,7 @@ impl Camt053 {
             buf.clear();
         }
 
-        // Validate required fields
-        if account_number.is_empty() {
-            return Err(ParseError::MissingField("account_number".into()));
-        }
-        if currency.is_empty() {
-            return Err(ParseError::MissingField("currency".into()));
-        }
-
-        Ok(Camt053 {
-            account_number,
-            currency,
-            opening_balance: opening_balance.unwrap_or(0.0),
-            opening_date: opening_date
-                .ok_or_else(|| ParseError::MissingField("opening_date".into()))?,
-            opening_indicator: opening_indicator
-                .ok_or_else(|| ParseError::MissingField("opening_indicator".into()))?,
-            closing_balance: closing_balance.unwrap_or(0.0),
-            closing_date: closing_date
-                .ok_or_else(|| ParseError::MissingField("closing_date".into()))?,
-            closing_indicator: closing_indicator
-                .ok_or_else(|| ParseError::MissingField("closing_indicator".into()))?,
-            transactions,
-        })
+        parser.build_statement()
     }
 
     /// Write CAMT.053 to any destination implementing Write
@@ -362,6 +162,533 @@ impl Camt053 {
                 field: "transaction_type".into(),
                 value: s.to_string(),
             }),
+        }
+    }
+}
+
+#[derive(Default)]
+struct CamtParser {
+    account_number: Option<String>,
+    currency: Option<String>,
+    opening_balance: Option<f64>,
+    opening_date: Option<DateTime<FixedOffset>>,
+    opening_indicator: Option<BalanceType>,
+    closing_balance: Option<f64>,
+    closing_date: Option<DateTime<FixedOffset>>,
+    closing_indicator: Option<BalanceType>,
+    transactions: Vec<Transaction>,
+    balance_scratch: BalanceScratch,
+    entry_scratch: Option<EntryScratch>,
+    path: Vec<ElementName>,
+}
+
+impl CamtParser {
+    fn handle_start(&mut self, event: &BytesStart) -> Result<(), ParseError> {
+        let name = Self::map_name(event.name().as_ref())?;
+        self.path.push(name);
+
+        match name {
+            ElementName::Balance => self.balance_scratch.clear(),
+            ElementName::Entry => self.entry_scratch = Some(EntryScratch::default()),
+            ElementName::Amount => self.capture_currency(event.attributes())?,
+            _ => {}
+        }
+
+        Ok(())
+    }
+
+    fn handle_end(&mut self, _event: &BytesEnd) -> Result<(), ParseError> {
+        if let Some(ended) = self.path.pop() {
+            match ended {
+                ElementName::Balance => self.finish_balance(),
+                ElementName::Entry => self.finish_entry(),
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    fn handle_text(&mut self, text: &str) -> Result<(), ParseError> {
+        if self.in_statement_account_id() {
+            self.set_account_number(text);
+        } else if self.path_ends_with(&[ElementName::Acct, ElementName::Currency]) {
+            self.set_currency(text);
+        } else if self.path_ends_with(&[
+            ElementName::Balance,
+            ElementName::BalanceType,
+            ElementName::CodeOrProprietary,
+            ElementName::Code,
+        ]) {
+            self.balance_scratch.balance_type = Some(text.to_string());
+        } else if self.path_ends_with(&[ElementName::Balance, ElementName::Amount]) {
+            self.balance_scratch.amount = Some(text.to_string());
+        } else if self.path_ends_with(&[ElementName::Balance, ElementName::CreditDebit]) {
+            self.balance_scratch.indicator = Some(text.to_string());
+        } else if self.path_ends_with(&[ElementName::Balance, ElementName::Date, ElementName::Date])
+        {
+            self.balance_scratch.date = Some(text.to_string());
+        } else if self.path_ends_with(&[ElementName::Entry, ElementName::Amount]) {
+            if let Some(entry) = self.entry_scratch.as_mut() {
+                entry.amount = Some(text.to_string());
+            }
+        } else if self.path_ends_with(&[ElementName::Entry, ElementName::CreditDebit]) {
+            if let Some(entry) = self.entry_scratch.as_mut() {
+                entry.indicator = Some(text.to_string());
+            }
+        } else if self.path_ends_with(&[
+            ElementName::Entry,
+            ElementName::BookingDate,
+            ElementName::Date,
+        ]) {
+            if let Some(entry) = self.entry_scratch.as_mut() {
+                entry.booking_date = Some(text.to_string());
+            }
+        } else if self.path_ends_with(&[
+            ElementName::Entry,
+            ElementName::ValueDate,
+            ElementName::Date,
+        ]) {
+            if let Some(entry) = self.entry_scratch.as_mut() {
+                entry.value_date = Some(text.to_string());
+            }
+        } else if self.path_ends_with(&[ElementName::Entry, ElementName::EntryRef]) {
+            if let Some(entry) = self.entry_scratch.as_mut() {
+                entry.ntry_ref = Some(text.to_string());
+            }
+        } else if self.path_ends_with(&[
+            ElementName::Entry,
+            ElementName::EntryDetails,
+            ElementName::TransactionDetails,
+            ElementName::References,
+            ElementName::TransactionId,
+        ]) {
+            if let Some(entry) = self.entry_scratch.as_mut() {
+                entry.tx_id = Some(text.to_string());
+            }
+        } else if self.path_ends_with(&[
+            ElementName::Entry,
+            ElementName::EntryDetails,
+            ElementName::TransactionDetails,
+            ElementName::RemittanceInfo,
+            ElementName::UnstructuredRemittance,
+        ]) {
+            if let Some(entry) = self.entry_scratch.as_mut() {
+                entry.push_description(text);
+            }
+        } else if self.path_ends_with(&[
+            ElementName::Entry,
+            ElementName::EntryDetails,
+            ElementName::TransactionDetails,
+            ElementName::RemittanceInfo,
+            ElementName::StructuredRemittance,
+            ElementName::CreditorReferenceInfo,
+            ElementName::ReferenceValue,
+        ]) {
+            if let Some(entry) = self.entry_scratch.as_mut() {
+                entry.set_description_if_empty(text);
+            }
+        } else if self.path_ends_with(&[
+            ElementName::Entry,
+            ElementName::EntryDetails,
+            ElementName::TransactionDetails,
+            ElementName::RelatedParties,
+            ElementName::Debtor,
+            ElementName::Name,
+        ]) {
+            if let Some(entry) = self.entry_scratch.as_mut() {
+                entry.counterparty_name = Some(text.to_string());
+            }
+        } else if self.path_ends_with(&[
+            ElementName::Entry,
+            ElementName::EntryDetails,
+            ElementName::TransactionDetails,
+            ElementName::RelatedParties,
+            ElementName::Creditor,
+            ElementName::Name,
+        ]) {
+            if let Some(entry) = self.entry_scratch.as_mut() {
+                if entry.counterparty_name.is_none() {
+                    entry.counterparty_name = Some(text.to_string());
+                }
+            }
+        } else if self.in_debtor_account_id() {
+            if let Some(entry) = self.entry_scratch.as_mut() {
+                entry.counterparty_account = Some(text.to_string());
+            }
+        } else if self.in_creditor_account_id() {
+            if let Some(entry) = self.entry_scratch.as_mut() {
+                if entry.counterparty_account.is_none() {
+                    entry.counterparty_account = Some(text.to_string());
+                }
+            }
+        } else if self.path_ends_with(&[ElementName::Entry, ElementName::AdditionalInfo]) {
+            if let Some(entry) = self.entry_scratch.as_mut() {
+                entry.push_description(text);
+            }
+        }
+
+        Ok(())
+    }
+
+    fn build_statement(self) -> Result<Camt053, ParseError> {
+        let account_number = self
+            .account_number
+            .ok_or_else(|| ParseError::MissingField("account_number".into()))?;
+        let currency = self
+            .currency
+            .ok_or_else(|| ParseError::MissingField("currency".into()))?;
+
+        Ok(Camt053 {
+            account_number,
+            currency,
+            opening_balance: self.opening_balance.unwrap_or(0.0),
+            opening_date: self
+                .opening_date
+                .ok_or_else(|| ParseError::MissingField("opening_date".into()))?,
+            opening_indicator: self
+                .opening_indicator
+                .ok_or_else(|| ParseError::MissingField("opening_indicator".into()))?,
+            closing_balance: self.closing_balance.unwrap_or(0.0),
+            closing_date: self
+                .closing_date
+                .ok_or_else(|| ParseError::MissingField("closing_date".into()))?,
+            closing_indicator: self
+                .closing_indicator
+                .ok_or_else(|| ParseError::MissingField("closing_indicator".into()))?,
+            transactions: self.transactions,
+        })
+    }
+
+    fn finish_balance(&mut self) {
+        if let Some(balance_type) = self.balance_scratch.balance_type.as_deref() {
+            match balance_type {
+                "OPBD" => self.apply_balance(BalanceKind::Opening),
+                "CLBD" => self.apply_balance(BalanceKind::Closing),
+                _ => {}
+            }
+        }
+        self.balance_scratch.clear();
+    }
+
+    fn apply_balance(&mut self, kind: BalanceKind) {
+        if let Some(amount_text) = self.balance_scratch.amount.as_deref() {
+            if let Ok(amount) = Camt053::parse_amount(amount_text) {
+                match kind {
+                    BalanceKind::Opening => self.opening_balance = Some(amount),
+                    BalanceKind::Closing => self.closing_balance = Some(amount),
+                }
+            }
+        }
+
+        if let Some(indicator_text) = self.balance_scratch.indicator.as_deref() {
+            if let Ok(indicator) = Camt053::parse_balance_indicator(indicator_text) {
+                match kind {
+                    BalanceKind::Opening => self.opening_indicator = Some(indicator),
+                    BalanceKind::Closing => self.closing_indicator = Some(indicator),
+                }
+            }
+        }
+
+        if let Some(date_text) = self.balance_scratch.date.as_deref() {
+            if let Ok(date) = Camt053::parse_xml_date(date_text) {
+                match kind {
+                    BalanceKind::Opening => self.opening_date = Some(date),
+                    BalanceKind::Closing => self.closing_date = Some(date),
+                }
+            }
+        }
+    }
+
+    fn finish_entry(&mut self) {
+        if let Some(entry) = self.entry_scratch.take() {
+            if let Ok(Some(tx)) = entry.finish() {
+                self.transactions.push(tx);
+            }
+        }
+    }
+
+    fn capture_currency(&mut self, attributes: Attributes<'_>) -> Result<(), ParseError> {
+        if self.currency.is_some() {
+            return Ok(());
+        }
+
+        for attr in attributes {
+            let attr = attr
+                .map_err(|err| ParseError::Camt053Error(format!("XML attribute error: {}", err)))?;
+            if attr.key.as_ref() == b"Ccy" {
+                let value = String::from_utf8(attr.value.as_ref().to_vec()).map_err(|err| {
+                    ParseError::Camt053Error(format!("Invalid currency encoding: {}", err))
+                })?;
+                if !value.trim().is_empty() {
+                    self.currency = Some(value);
+                }
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn set_account_number(&mut self, text: &str) {
+        if self
+            .account_number
+            .as_ref()
+            .map(|value| value.is_empty())
+            .unwrap_or(true)
+        {
+            self.account_number = Some(text.to_string());
+        }
+    }
+
+    fn set_currency(&mut self, text: &str) {
+        if self.currency.is_none() && !text.trim().is_empty() {
+            self.currency = Some(text.to_string());
+        }
+    }
+
+    fn path_ends_with(&self, suffix: &[ElementName]) -> bool {
+        if self.path.len() < suffix.len() {
+            return false;
+        }
+        let offset = self.path.len() - suffix.len();
+        self.path[offset..] == *suffix
+    }
+
+    fn in_statement_account_id(&self) -> bool {
+        self.path_ends_with(&[ElementName::Acct, ElementName::Id, ElementName::Iban])
+            || self.path_ends_with(&[
+                ElementName::Acct,
+                ElementName::Id,
+                ElementName::Other,
+                ElementName::Id,
+            ])
+    }
+
+    fn in_debtor_account_id(&self) -> bool {
+        self.path_ends_with(&[
+            ElementName::Entry,
+            ElementName::EntryDetails,
+            ElementName::TransactionDetails,
+            ElementName::RelatedParties,
+            ElementName::DebtorAccount,
+            ElementName::Id,
+            ElementName::Iban,
+        ]) || self.path_ends_with(&[
+            ElementName::Entry,
+            ElementName::EntryDetails,
+            ElementName::TransactionDetails,
+            ElementName::RelatedParties,
+            ElementName::DebtorAccount,
+            ElementName::Id,
+            ElementName::Other,
+            ElementName::Id,
+        ])
+    }
+
+    fn in_creditor_account_id(&self) -> bool {
+        self.path_ends_with(&[
+            ElementName::Entry,
+            ElementName::EntryDetails,
+            ElementName::TransactionDetails,
+            ElementName::RelatedParties,
+            ElementName::CreditorAccount,
+            ElementName::Id,
+            ElementName::Iban,
+        ]) || self.path_ends_with(&[
+            ElementName::Entry,
+            ElementName::EntryDetails,
+            ElementName::TransactionDetails,
+            ElementName::RelatedParties,
+            ElementName::CreditorAccount,
+            ElementName::Id,
+            ElementName::Other,
+            ElementName::Id,
+        ])
+    }
+
+    fn map_name(raw: &[u8]) -> Result<ElementName, ParseError> {
+        let name = std::str::from_utf8(raw).map_err(|err| {
+            ParseError::Camt053Error(format!("Invalid XML tag name encoding: {}", err))
+        })?;
+        let normalized = name.rsplit(':').next().unwrap_or(name);
+        Ok(ElementName::from_name(normalized))
+    }
+}
+
+#[derive(Default)]
+struct BalanceScratch {
+    balance_type: Option<String>,
+    amount: Option<String>,
+    indicator: Option<String>,
+    date: Option<String>,
+}
+
+impl BalanceScratch {
+    fn clear(&mut self) {
+        self.balance_type = None;
+        self.amount = None;
+        self.indicator = None;
+        self.date = None;
+    }
+}
+
+#[derive(Default)]
+struct EntryScratch {
+    amount: Option<String>,
+    indicator: Option<String>,
+    booking_date: Option<String>,
+    value_date: Option<String>,
+    ntry_ref: Option<String>,
+    tx_id: Option<String>,
+    description: String,
+    counterparty_name: Option<String>,
+    counterparty_account: Option<String>,
+}
+
+impl EntryScratch {
+    fn push_description(&mut self, text: &str) {
+        if !self.description.is_empty() {
+            self.description.push(' ');
+        }
+        self.description.push_str(text);
+    }
+
+    fn set_description_if_empty(&mut self, text: &str) {
+        if self.description.is_empty() {
+            self.description = text.to_string();
+        }
+    }
+
+    fn finish(self) -> Result<Option<Transaction>, ParseError> {
+        let amount = match self
+            .amount
+            .as_deref()
+            .and_then(|value| Camt053::parse_amount(value).ok())
+        {
+            Some(value) => value,
+            None => return Ok(None),
+        };
+
+        let transaction_type = match self
+            .indicator
+            .as_deref()
+            .and_then(|value| Camt053::parse_transaction_type(value).ok())
+        {
+            Some(value) => value,
+            None => return Ok(None),
+        };
+
+        let booking_date = match self
+            .booking_date
+            .as_deref()
+            .and_then(|value| Camt053::parse_xml_date(value).ok())
+        {
+            Some(value) => value,
+            None => return Ok(None),
+        };
+
+        let value_date = self.value_date.map(|value| value.to_string());
+        let reference = self.tx_id.or(self.ntry_ref);
+        let counterparty_name = self.counterparty_name;
+        let counterparty_account = self.counterparty_account;
+        let description = self.description.trim().to_string();
+
+        Ok(Some(Transaction {
+            booking_date,
+            value_date,
+            amount,
+            transaction_type,
+            description,
+            reference,
+            counterparty_name,
+            counterparty_account,
+        }))
+    }
+}
+
+enum BalanceKind {
+    Opening,
+    Closing,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ElementName {
+    Document,
+    BkToCstmrStmt,
+    Stmt,
+    Acct,
+    Id,
+    Iban,
+    Currency,
+    Balance,
+    BalanceType,
+    CodeOrProprietary,
+    Code,
+    Amount,
+    CreditDebit,
+    Date,
+    Entry,
+    EntryRef,
+    BookingDate,
+    ValueDate,
+    EntryDetails,
+    TransactionDetails,
+    References,
+    TransactionId,
+    RemittanceInfo,
+    UnstructuredRemittance,
+    StructuredRemittance,
+    CreditorReferenceInfo,
+    ReferenceValue,
+    RelatedParties,
+    Debtor,
+    Creditor,
+    DebtorAccount,
+    CreditorAccount,
+    Name,
+    AdditionalInfo,
+    Other,
+}
+
+impl ElementName {
+    fn from_name(name: &str) -> Self {
+        match name {
+            "Document" => ElementName::Document,
+            "BkToCstmrStmt" => ElementName::BkToCstmrStmt,
+            "Stmt" => ElementName::Stmt,
+            "Acct" => ElementName::Acct,
+            "Id" => ElementName::Id,
+            "IBAN" => ElementName::Iban,
+            "Ccy" => ElementName::Currency,
+            "Bal" => ElementName::Balance,
+            "Tp" => ElementName::BalanceType,
+            "CdOrPrtry" => ElementName::CodeOrProprietary,
+            "Cd" => ElementName::Code,
+            "Amt" => ElementName::Amount,
+            "CdtDbtInd" => ElementName::CreditDebit,
+            "Dt" => ElementName::Date,
+            "Ntry" => ElementName::Entry,
+            "NtryRef" => ElementName::EntryRef,
+            "BookgDt" => ElementName::BookingDate,
+            "ValDt" => ElementName::ValueDate,
+            "NtryDtls" => ElementName::EntryDetails,
+            "TxDtls" => ElementName::TransactionDetails,
+            "Refs" => ElementName::References,
+            "TxId" => ElementName::TransactionId,
+            "RmtInf" => ElementName::RemittanceInfo,
+            "Ustrd" => ElementName::UnstructuredRemittance,
+            "Strd" => ElementName::StructuredRemittance,
+            "CdtrRefInf" => ElementName::CreditorReferenceInfo,
+            "Ref" => ElementName::ReferenceValue,
+            "RltdPties" => ElementName::RelatedParties,
+            "Dbtr" => ElementName::Debtor,
+            "Cdtr" => ElementName::Creditor,
+            "DbtrAcct" => ElementName::DebtorAccount,
+            "CdtrAcct" => ElementName::CreditorAccount,
+            "Nm" => ElementName::Name,
+            "AddtlTxInf" => ElementName::AdditionalInfo,
+            "Othr" => ElementName::Other,
+            _ => ElementName::Other,
         }
     }
 }
