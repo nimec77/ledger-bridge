@@ -120,15 +120,15 @@ impl Camt053 {
                     // Process balance when </Bal> is reached
                     if name == "Bal" && !current_balance_type.is_empty() {
                         if current_balance_type == "OPBD" {
-                            opening_balance = parse_amount(&current_balance_amount).ok();
+                            opening_balance = Self::parse_amount(&current_balance_amount).ok();
                             opening_indicator =
-                                parse_balance_indicator(&current_balance_indicator).ok();
-                            opening_date = parse_xml_date(&current_balance_date).ok();
+                                Self::parse_balance_indicator(&current_balance_indicator).ok();
+                            opening_date = Self::parse_xml_date(&current_balance_date).ok();
                         } else if current_balance_type == "CLBD" {
-                            closing_balance = parse_amount(&current_balance_amount).ok();
+                            closing_balance = Self::parse_amount(&current_balance_amount).ok();
                             closing_indicator =
-                                parse_balance_indicator(&current_balance_indicator).ok();
-                            closing_date = parse_xml_date(&current_balance_date).ok();
+                                Self::parse_balance_indicator(&current_balance_indicator).ok();
+                            closing_date = Self::parse_xml_date(&current_balance_date).ok();
                         }
                         // Clear balance state
                         current_balance_type.clear();
@@ -140,9 +140,9 @@ impl Camt053 {
                     // Process entry when </Ntry> is reached
                     if name == "Ntry" && in_entry {
                         if let (Ok(amount), Ok(tx_type), Ok(booking_date)) = (
-                            parse_amount(&entry_amount),
-                            parse_transaction_type(&entry_type),
-                            parse_xml_date(&entry_booking_date),
+                            Self::parse_amount(&entry_amount),
+                            Self::parse_transaction_type(&entry_type),
+                            Self::parse_xml_date(&entry_booking_date),
                         ) {
                             let transaction = Transaction {
                                 booking_date,
@@ -321,48 +321,48 @@ impl Camt053 {
             "CAMT.053 writing to be implemented in Task 4.3".into(),
         ))
     }
-}
 
-/// Parse amount from string (handles both dot and comma as decimal separator)
-fn parse_amount(s: &str) -> Result<f64, ParseError> {
-    let cleaned = s.trim().replace(',', ".");
-    cleaned
-        .parse::<f64>()
-        .map_err(|_| ParseError::InvalidFieldValue {
-            field: "amount".into(),
-            value: s.into(),
-        })
-}
-
-/// Parse XML date/datetime to DateTime<FixedOffset>
-fn parse_xml_date(s: &str) -> Result<DateTime<FixedOffset>, ParseError> {
-    let s = s.trim();
-
-    // Try parsing as datetime first (2023-04-20T23:24:31)
-    utils::parse_date(s)
-}
-
-/// Parse balance indicator (CRDT/DBIT) to BalanceType
-fn parse_balance_indicator(s: &str) -> Result<BalanceType, ParseError> {
-    match s.trim() {
-        "CRDT" => Ok(BalanceType::Credit),
-        "DBIT" => Ok(BalanceType::Debit),
-        _ => Err(ParseError::InvalidFieldValue {
-            field: "balance_indicator".into(),
-            value: s.to_string(),
-        }),
+    /// Parse amount from string (handles both dot and comma as decimal separator)
+    fn parse_amount(s: &str) -> Result<f64, ParseError> {
+        let cleaned = s.trim().replace(',', ".");
+        cleaned
+            .parse::<f64>()
+            .map_err(|_| ParseError::InvalidFieldValue {
+                field: "amount".into(),
+                value: s.into(),
+            })
     }
-}
 
-/// Parse transaction type (CRDT/DBIT) to TransactionType
-fn parse_transaction_type(s: &str) -> Result<TransactionType, ParseError> {
-    match s.trim() {
-        "CRDT" => Ok(TransactionType::Credit),
-        "DBIT" => Ok(TransactionType::Debit),
-        _ => Err(ParseError::InvalidFieldValue {
-            field: "transaction_type".into(),
-            value: s.to_string(),
-        }),
+    /// Parse XML date/datetime to DateTime<FixedOffset>
+    fn parse_xml_date(s: &str) -> Result<DateTime<FixedOffset>, ParseError> {
+        let s = s.trim();
+
+        // Try parsing as datetime first (2023-04-20T23:24:31)
+        utils::parse_date(s)
+    }
+
+    /// Parse balance indicator (CRDT/DBIT) to BalanceType
+    fn parse_balance_indicator(s: &str) -> Result<BalanceType, ParseError> {
+        match s.trim() {
+            "CRDT" => Ok(BalanceType::Credit),
+            "DBIT" => Ok(BalanceType::Debit),
+            _ => Err(ParseError::InvalidFieldValue {
+                field: "balance_indicator".into(),
+                value: s.to_string(),
+            }),
+        }
+    }
+
+    /// Parse transaction type (CRDT/DBIT) to TransactionType
+    fn parse_transaction_type(s: &str) -> Result<TransactionType, ParseError> {
+        match s.trim() {
+            "CRDT" => Ok(TransactionType::Credit),
+            "DBIT" => Ok(TransactionType::Debit),
+            _ => Err(ParseError::InvalidFieldValue {
+                field: "transaction_type".into(),
+                value: s.to_string(),
+            }),
+        }
     }
 }
 
@@ -557,47 +557,50 @@ mod tests {
 
     #[test]
     fn test_parse_amount() {
-        assert_eq!(parse_amount("123.45").unwrap(), 123.45);
-        assert_eq!(parse_amount("123,45").unwrap(), 123.45);
-        assert_eq!(parse_amount("  123.45  ").unwrap(), 123.45);
-        assert!(parse_amount("invalid").is_err());
+        assert_eq!(Camt053::parse_amount("123.45").unwrap(), 123.45);
+        assert_eq!(Camt053::parse_amount("123,45").unwrap(), 123.45);
+        assert_eq!(Camt053::parse_amount("  123.45  ").unwrap(), 123.45);
+        assert!(Camt053::parse_amount("invalid").is_err());
     }
 
     #[test]
     fn test_parse_balance_indicator() {
         assert_eq!(
-            parse_balance_indicator("CRDT").unwrap(),
+            Camt053::parse_balance_indicator("CRDT").unwrap(),
             BalanceType::Credit
         );
-        assert_eq!(parse_balance_indicator("DBIT").unwrap(), BalanceType::Debit);
-        assert!(parse_balance_indicator("INVALID").is_err());
+        assert_eq!(
+            Camt053::parse_balance_indicator("DBIT").unwrap(),
+            BalanceType::Debit
+        );
+        assert!(Camt053::parse_balance_indicator("INVALID").is_err());
     }
 
     #[test]
     fn test_parse_transaction_type() {
         assert_eq!(
-            parse_transaction_type("CRDT").unwrap(),
+            Camt053::parse_transaction_type("CRDT").unwrap(),
             TransactionType::Credit
         );
         assert_eq!(
-            parse_transaction_type("DBIT").unwrap(),
+            Camt053::parse_transaction_type("DBIT").unwrap(),
             TransactionType::Debit
         );
-        assert!(parse_transaction_type("INVALID").is_err());
+        assert!(Camt053::parse_transaction_type("INVALID").is_err());
     }
 
     #[test]
     fn test_parse_xml_date() {
         // Test date only
-        let result = parse_xml_date("2023-04-20");
+        let result = Camt053::parse_xml_date("2023-04-20");
         assert!(result.is_ok());
 
         // Test datetime
-        let result = parse_xml_date("2023-04-20T23:24:31");
+        let result = Camt053::parse_xml_date("2023-04-20T23:24:31");
         assert!(result.is_ok());
 
         // Test with timezone
-        let result = parse_xml_date("2023-04-20T23:24:31+00:00");
+        let result = Camt053::parse_xml_date("2023-04-20T23:24:31+00:00");
         assert!(result.is_ok());
     }
 }

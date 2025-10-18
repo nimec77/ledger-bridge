@@ -4,8 +4,8 @@ use crate::ParseError;
 
 pub fn parse_date(date_str: &str) -> Result<DateTime<FixedOffset>, ParseError> {
     let formats = vec![
-        "%d.%m.%Y", // e.g., "26.10.2023"
-        "%Y-%m-%d", // e.g., "2023-10-26"
+        "%d.%m.%Y",          // e.g., "26.10.2023"
+        "%Y-%m-%d",          // e.g., "2023-10-26"
         "%Y-%m-%dT%H:%M:%S", // e.g., "2023-10-26T12:00:00"
     ];
 
