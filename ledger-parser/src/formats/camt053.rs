@@ -1,16 +1,16 @@
-use chrono::{DateTime, FixedOffset};
-use serde::{Deserialize, Serialize};
-use std::io::{Read, Write};
-
-use crate::error::ParseError;
-use crate::model::{BalanceType, Transaction};
-
 mod parser;
 mod elements;
 mod scratch;
 mod utils;
 
 use parser::CamtParser;
+
+use chrono::{DateTime, FixedOffset};
+use serde::{Deserialize, Serialize};
+use std::io::{Read, Write};
+
+use crate::error::ParseError;
+use crate::model::{BalanceType, Transaction};
 
 /// ISO 20022 CAMT.053 XML structure
 ///
@@ -81,7 +81,12 @@ impl Camt053 {
                     }
                 }
                 Ok(quick_xml::events::Event::Eof) => break,
-                Err(e) => return Err(ParseError::Camt053Error(format!("XML parse error: {}", e))),
+                Err(e) => {
+                    return Err(ParseError::Camt053Error(format!(
+                        "XML parse error: {}",
+                        e
+                    )))
+                }
                 _ => {}
             }
             buf.clear();
@@ -152,3 +157,4 @@ mod tests {
         assert_eq!(statement.closing_balance, 1500.0);
     }
 }
+

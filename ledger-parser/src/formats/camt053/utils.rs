@@ -5,7 +5,7 @@ use crate::formats::utils;
 use crate::model::{BalanceType, TransactionType};
 
 /// Parse amount from string (handles both dot and comma as decimal separator)
-pub fn parse_amount(s: &str) -> Result<f64, ParseError> {
+pub(super) fn parse_amount(s: &str) -> Result<f64, ParseError> {
     let cleaned = s.trim().replace(',', ".");
     cleaned
         .parse::<f64>()
@@ -16,7 +16,7 @@ pub fn parse_amount(s: &str) -> Result<f64, ParseError> {
 }
 
 /// Parse XML date/datetime to DateTime<FixedOffset>
-pub fn parse_xml_date(s: &str) -> Result<DateTime<FixedOffset>, ParseError> {
+pub(super) fn parse_xml_date(s: &str) -> Result<DateTime<FixedOffset>, ParseError> {
     let s = s.trim();
 
     // Try parsing as datetime first (2023-04-20T23:24:31)
@@ -24,7 +24,7 @@ pub fn parse_xml_date(s: &str) -> Result<DateTime<FixedOffset>, ParseError> {
 }
 
 /// Parse balance indicator (CRDT/DBIT) to BalanceType
-pub fn parse_balance_indicator(s: &str) -> Result<BalanceType, ParseError> {
+pub(super) fn parse_balance_indicator(s: &str) -> Result<BalanceType, ParseError> {
     match s.trim() {
         "CRDT" => Ok(BalanceType::Credit),
         "DBIT" => Ok(BalanceType::Debit),
@@ -36,7 +36,7 @@ pub fn parse_balance_indicator(s: &str) -> Result<BalanceType, ParseError> {
 }
 
 /// Parse transaction type (CRDT/DBIT) to TransactionType
-pub fn parse_transaction_type(s: &str) -> Result<TransactionType, ParseError> {
+pub(super) fn parse_transaction_type(s: &str) -> Result<TransactionType, ParseError> {
     match s.trim() {
         "CRDT" => Ok(TransactionType::Credit),
         "DBIT" => Ok(TransactionType::Debit),
