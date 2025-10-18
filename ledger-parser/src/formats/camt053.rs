@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 
 use crate::error::ParseError;
+use crate::formats::utils;
 use crate::model::{BalanceType, Transaction, TransactionType};
 
 /// ISO 20022 CAMT.053 XML structure
@@ -338,18 +339,6 @@ fn parse_xml_date(s: &str) -> Result<DateTime<FixedOffset>, ParseError> {
     let s = s.trim();
 
     // Try parsing as datetime first (2023-04-20T23:24:31)
-    if s.contains('T') {
-        if let Ok(dt) = DateTime::parse_from_rfc3339(s) {
-            return Ok(dt);
-        }
-        // Try with explicit timezone
-        if let Ok(dt) = DateTime::parse_from_rfc3339(&format!("{}+00:00", s)) {
-            return Ok(dt);
-        }
-    }
-
-    // Try parsing as date only (2023-04-20)
-    use crate::formats::utils;
     utils::parse_date(s)
 }
 
