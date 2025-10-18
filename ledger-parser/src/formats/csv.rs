@@ -1,4 +1,4 @@
-use crate::{BalanceType, ParseError, Transaction, TransactionType};
+use crate::{formats::utils, BalanceType, ParseError, Transaction, TransactionType};
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 
@@ -259,7 +259,8 @@ impl CsvStatement {
         if date_str.is_empty() {
             return Err(ParseError::CsvError("Empty date field".to_string()));
         }
-        let booking_date = Self::parse_russian_date(&date_str)?;
+        let booking_date =
+            utils::parse_date(&date_str).ok_or(ParseError::CsvError("Invalid date".to_string()))?;
 
         // Extract debit amount (column 9, around index 9)
         let debit_str = get_field(9);
@@ -308,35 +309,6 @@ impl CsvStatement {
             counterparty_name: None,    // Could extract from account field
             counterparty_account: None, // Could extract from account field
         })
-    }
-
-    /// Parse Russian date format (DD.MM.YYYY) to ISO format (YYYY-MM-DD)
-    fn parse_russian_date(date_str: &str) -> Result<String, ParseError> {
-        if date_str.is_empty() {
-            return Err(ParseError::CsvError("Empty date".to_string()));
-        }
-
-        let parts: Vec<&str> = date_str.split('.').collect();
-        if parts.len() != 3 {
-            return Err(ParseError::CsvError(format!(
-                "Invalid date format: {}",
-                date_str
-            )));
-        }
-
-        let day = parts[0];
-        let month = parts[1];
-        let year = parts[2];
-
-        // Validate components
-        if day.len() != 2 || month.len() != 2 || year.len() != 4 {
-            return Err(ParseError::CsvError(format!(
-                "Invalid date components: {}",
-                date_str
-            )));
-        }
-
-        Ok(format!("{}-{}-{}", year, month, day))
     }
 
     /// Parse Russian amount format (comma as decimal separator)
@@ -522,7 +494,9 @@ impl CsvStatement {
     ) -> Result<(), ParseError> {
         for tx in transactions {
             let mut row = vec![String::new(); 21];
-            row[1] = Self::format_russian_date(&tx.booking_date);
+            let booking_date = tx.booking_date;
+
+            row[1] = booking_date.format("%d.%m.%Y").to_string();
 
             match tx.transaction_type {
                 TransactionType::Debit => {
@@ -655,9 +629,9 @@ mod tests {
 
     #[test]
     fn test_parse_russian_date() {
-        let result = CsvStatement::parse_russian_date("20.02.2024");
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "2024-02-20");
+        let result = utils::parse_date("20.02.2024");
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().format("%d.%m.%Y").to_string(), "20.02.2024");
     }
 
     #[test]
@@ -676,8 +650,8 @@ mod tests {
 
     #[test]
     fn test_parse_invalid_date() {
-        let result = CsvStatement::parse_russian_date("invalid");
-        assert!(result.is_err());
+        let result = utils::parse_date("invalid");
+        assert!(result.is_none());
     }
 
     #[test]

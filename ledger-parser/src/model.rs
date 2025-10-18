@@ -1,3 +1,4 @@
+use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 
 /// Balance type indicator (credit or debit position)
@@ -17,24 +18,26 @@ pub enum TransactionType {
 /// Individual transaction entry (shared across all formats)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Transaction {
-    pub booking_date: String,       // ISO 8601: "YYYY-MM-DD" (when booked)
-    pub value_date: Option<String>, // ISO 8601: "YYYY-MM-DD" (value date, optional)
-    pub amount: f64,                // Always positive number
-    pub transaction_type: TransactionType, // Credit or Debit
-    pub description: String,        // Transaction description/narrative
-    pub reference: Option<String>,  // Optional reference/transaction ID
-    pub counterparty_name: Option<String>, // Debtor/Creditor name
+    pub booking_date: DateTime<FixedOffset>, // ISO 8601: "YYYY-MM-DD" (when booked)
+    pub value_date: Option<String>,          // ISO 8601: "YYYY-MM-DD" (value date, optional)
+    pub amount: f64,                         // Always positive number
+    pub transaction_type: TransactionType,   // Credit or Debit
+    pub description: String,                 // Transaction description/narrative
+    pub reference: Option<String>,           // Optional reference/transaction ID
+    pub counterparty_name: Option<String>,   // Debtor/Creditor name
     pub counterparty_account: Option<String>, // Counterparty account/IBAN
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::formats::utils;
+
     use super::*;
 
     #[test]
     fn test_transaction_creation() {
         let tx = Transaction {
-            booking_date: "2025-01-15".to_string(),
+            booking_date: utils::parse_date("2025-01-15").unwrap(),
             value_date: Some("2025-01-15".to_string()),
             amount: 100.50,
             transaction_type: TransactionType::Credit,
@@ -68,7 +71,7 @@ mod tests {
     #[test]
     fn test_transaction_serialization() {
         let tx = Transaction {
-            booking_date: "2025-01-15".to_string(),
+            booking_date: utils::parse_date("2025-01-15").unwrap(),
             value_date: None,
             amount: 250.75,
             transaction_type: TransactionType::Debit,
