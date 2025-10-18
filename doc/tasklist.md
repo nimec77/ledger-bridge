@@ -9,7 +9,7 @@
 | Iteration | Status | Tasks | Focus | Testable Output |
 |-----------|--------|-------|-------|-----------------|
 | **Iteration 0** | ✅ Complete | 2/2 | Setup | Workspace builds |
-| **Iteration 1** | ⏳ Pending | 0/3 | Foundation | Core types compile |
+| **Iteration 1** | ✅ Complete | 3/3 | Foundation | Core types compile |
 | **Iteration 2** | ⏳ Pending | 0/4 | CSV | Parse & write CSV |
 | **Iteration 3** | ⏳ Pending | 0/4 | MT940 | Parse & write MT940 |
 | **Iteration 4** | ⏳ Pending | 0/4 | CAMT.053 | Parse & write XML |
@@ -19,7 +19,7 @@
 
 **Legend:** ⏳ Pending | 🔄 In Progress | ✅ Complete | ❌ Blocked
 
-**Overall Progress:** 2/25 tasks complete (8%)
+**Overall Progress:** 5/25 tasks complete (20%)
 
 ---
 
@@ -47,9 +47,9 @@ cargo build
 **Testable:** Types compile, unit tests pass
 
 ### Tasks
-- [ ] **1.1** Create `model.rs` with `Transaction`, `BalanceType`, `TransactionType`
-- [ ] **1.2** Create `error.rs` with `ParseError` enum (Display, Error, From<io::Error>)
-- [ ] **1.3** Create `lib.rs` with public API exports
+- [x] **1.1** Create `model.rs` with `Transaction`, `BalanceType`, `TransactionType`
+- [x] **1.2** Create `error.rs` with `ParseError` enum (Display, Error, From<io::Error>)
+- [x] **1.3** Create `lib.rs` with public API exports
 
 **Test Command:**
 ```bash
