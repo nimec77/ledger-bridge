@@ -1,4 +1,5 @@
 use crate::{formats::utils, BalanceType, ParseError, Transaction, TransactionType};
+use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 
@@ -18,10 +19,10 @@ pub struct CsvStatement {
     pub account_number: String,
     pub currency: String,
     pub opening_balance: f64,
-    pub opening_date: String,
+    pub opening_date: DateTime<FixedOffset>,
     pub opening_indicator: BalanceType,
     pub closing_balance: f64,
-    pub closing_date: String,
+    pub closing_date: DateTime<FixedOffset>,
     pub closing_indicator: BalanceType,
     #[serde(skip)]
     pub transactions: Vec<Transaction>,
@@ -259,8 +260,7 @@ impl CsvStatement {
         if date_str.is_empty() {
             return Err(ParseError::CsvError("Empty date field".to_string()));
         }
-        let booking_date =
-            utils::parse_date(&date_str).ok_or(ParseError::CsvError("Invalid date".to_string()))?;
+        let booking_date = utils::parse_date(&date_str)?;
 
         // Extract debit amount (column 9, around index 9)
         let debit_str = get_field(9);
@@ -330,7 +330,7 @@ impl CsvStatement {
     fn extract_opening_balance(
         records: &[csv::StringRecord],
         footer_start: usize,
-    ) -> Result<(f64, String, BalanceType), ParseError> {
+    ) -> Result<(f64, DateTime<FixedOffset>, BalanceType), ParseError> {
         // Look for "Входящий остаток" in footer
         for record in &records[footer_start..] {
             for (i, field) in record.iter().enumerate() {
@@ -351,8 +351,8 @@ impl CsvStatement {
                                 };
 
                                 // Try to extract date (often at end of row)
-                                let date = Self::extract_date_from_record(record)
-                                    .unwrap_or_else(|| "2024-01-01".to_string());
+                                let date =
+                                    utils::parse_date(&Self::extract_date_from_record(record)?)?;
 
                                 return Ok((amount.abs(), date, indicator));
                             }
@@ -371,7 +371,7 @@ impl CsvStatement {
     fn extract_closing_balance(
         records: &[csv::StringRecord],
         footer_start: usize,
-    ) -> Result<(f64, String, BalanceType), ParseError> {
+    ) -> Result<(f64, DateTime<FixedOffset>, BalanceType), ParseError> {
         // Look for "Исходящий остаток" in footer
         for record in &records[footer_start..] {
             for (i, field) in record.iter().enumerate() {
@@ -392,10 +392,13 @@ impl CsvStatement {
                                 };
 
                                 // Try to extract date (often at end of row)
-                                let date = Self::extract_date_from_record(record)
-                                    .unwrap_or_else(|| "2024-12-31".to_string());
+                                let date_str = Self::extract_date_from_record(record)?;
 
-                                return Ok((amount.abs(), date, indicator));
+                                return Ok((
+                                    amount.abs(),
+                                    utils::parse_date(&date_str)?,
+                                    indicator,
+                                ));
                             }
                         }
                     }
@@ -409,7 +412,7 @@ impl CsvStatement {
     }
 
     /// Extract date from a record (looks for date patterns)
-    fn extract_date_from_record(record: &csv::StringRecord) -> Option<String> {
+    fn extract_date_from_record(record: &csv::StringRecord) -> Result<String, ParseError> {
         for field in record.iter().rev() {
             let trimmed = field.trim();
             // Look for Russian date format like "01 января 2024 г."
@@ -421,14 +424,14 @@ impl CsvStatement {
                         if let Ok(year) = year_str.parse::<u32>() {
                             if (2000..=2100).contains(&year) {
                                 // For now, return a simple date - full parsing would require month name mapping
-                                return Some(format!("{}-01-01", year));
+                                return Ok(format!("{}-01-01", year));
                             }
                         }
                     }
                 }
             }
         }
-        None
+        Err(ParseError::CsvError("Date not found".to_string()))
     }
 
     /// Write header section
@@ -524,10 +527,10 @@ impl CsvStatement {
     fn write_footer<W: Write>(
         csv_writer: &mut csv::Writer<W>,
         opening_balance: f64,
-        opening_date: &str,
+        opening_date: &DateTime<FixedOffset>,
         opening_indicator: &BalanceType,
         closing_balance: f64,
-        closing_date: &str,
+        closing_date: &DateTime<FixedOffset>,
         closing_indicator: &BalanceType,
         transactions: &[Transaction],
     ) -> Result<(), ParseError> {
@@ -579,7 +582,7 @@ impl CsvStatement {
             "",
             "",
             "",
-            &Self::format_russian_date(opening_date),
+            &opening_date.format("%d.%m.%Y").to_string(),
         ])?;
 
         let closing_sign = match closing_indicator {
@@ -605,21 +608,10 @@ impl CsvStatement {
             "",
             "",
             "",
-            &Self::format_russian_date(closing_date),
+            &closing_date.format("%d.%m.%Y").to_string(),
         ])?;
 
         Ok(())
-    }
-
-    /// Format date as Russian format (DD.MM.YYYY)
-    fn format_russian_date(date_str: &str) -> String {
-        // Convert ISO format (YYYY-MM-DD) to Russian format (DD.MM.YYYY)
-        let parts: Vec<&str> = date_str.split('-').collect();
-        if parts.len() == 3 {
-            format!("{}.{}.{}", parts[2], parts[1], parts[0])
-        } else {
-            date_str.to_string()
-        }
     }
 }
 
@@ -630,7 +622,7 @@ mod tests {
     #[test]
     fn test_parse_russian_date() {
         let result = utils::parse_date("20.02.2024");
-        assert!(result.is_some());
+        assert!(result.is_ok());
         assert_eq!(result.unwrap().format("%d.%m.%Y").to_string(), "20.02.2024");
     }
 
@@ -651,21 +643,13 @@ mod tests {
     #[test]
     fn test_parse_invalid_date() {
         let result = utils::parse_date("invalid");
-        assert!(result.is_none());
+        assert!(result.is_err());
     }
 
     #[test]
     fn test_parse_invalid_amount() {
         let result = CsvStatement::parse_russian_amount("invalid");
         assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_format_russian_date() {
-        assert_eq!(
-            CsvStatement::format_russian_date("2024-02-20"),
-            "20.02.2024"
-        );
     }
 
     #[test]
@@ -682,10 +666,10 @@ mod tests {
             account_number: "40702810440000030888".to_string(),
             currency: "RUB".to_string(),
             opening_balance: 1332.54,
-            opening_date: "2024-01-01".to_string(),
+            opening_date: utils::parse_date("2024-01-01").unwrap(),
             opening_indicator: BalanceType::Credit,
             closing_balance: 5975.04,
-            closing_date: "2024-12-31".to_string(),
+            closing_date: utils::parse_date("2024-12-31").unwrap(),
             closing_indicator: BalanceType::Credit,
             transactions: vec![],
         };

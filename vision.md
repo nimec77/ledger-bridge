@@ -493,12 +493,12 @@ pub struct Mt940 {
     
     // Opening balance (starting position)
     pub opening_balance: f64,
-    pub opening_date: String,          // ISO 8601: "YYYY-MM-DD"
+    pub opening_date: DateTime<FixedOffset>,          // ISO 8601: "YYYY-MM-DD"
     pub opening_indicator: BalanceType, // Credit or Debit
     
     // Closing balance (ending position)
     pub closing_balance: f64,
-    pub closing_date: String,          // ISO 8601: "YYYY-MM-DD"
+    pub closing_date: DateTime<FixedOffset>,          // ISO 8601: "YYYY-MM-DD"
     pub closing_indicator: BalanceType, // Credit or Debit
     
     pub transactions: Vec<Transaction>,
@@ -529,7 +529,7 @@ pub enum BalanceType {
 /// Individual transaction entry (shared across all formats)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Transaction {
-    pub booking_date: String,           // ISO 8601: "YYYY-MM-DD" (when booked)
+    pub booking_date: DateTime<FixedOffset>,           // ISO 8601: "YYYY-MM-DD" (when booked)
     pub value_date: Option<String>,     // ISO 8601: "YYYY-MM-DD" (value date, optional)
     pub amount: f64,                    // Always positive number
     pub transaction_type: TransactionType, // Credit or Debit
