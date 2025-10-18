@@ -1,278 +1,294 @@
-# Ledger Bridge - Development Task List
+# Ledger Bridge - Iterative Development Plan
+
+> Step-by-step plan based on [@vision.md](../vision.md) and [@conventions.md](../conventions.md)
+
+---
 
 ## 📊 Progress Report
 
-| Phase | Status | Progress | Description |
-|-------|--------|----------|-------------|
-| **Phase 0** | ⏳ Pending | 0/3 | Project Setup & Foundation |
-| **Phase 1** | ⏳ Pending | 0/4 | CSV Format Implementation |
-| **Phase 2** | ⏳ Pending | 0/4 | MT940 Format Implementation |
-| **Phase 3** | ⏳ Pending | 0/4 | CAMT.053 Format Implementation |
-| **Phase 4** | ⏳ Pending | 0/3 | CLI Application |
-| **Phase 5** | ⏳ Pending | 0/3 | Testing & Validation |
+| Iteration | Status | Tasks | Focus | Testable Output |
+|-----------|--------|-------|-------|-----------------|
+| **Iteration 0** | ⏳ Pending | 0/2 | Setup | Workspace builds |
+| **Iteration 1** | ⏳ Pending | 0/3 | Foundation | Core types compile |
+| **Iteration 2** | ⏳ Pending | 0/4 | CSV | Parse & write CSV |
+| **Iteration 3** | ⏳ Pending | 0/4 | MT940 | Parse & write MT940 |
+| **Iteration 4** | ⏳ Pending | 0/4 | CAMT.053 | Parse & write XML |
+| **Iteration 5** | ⏳ Pending | 0/3 | Conversions | From trait works |
+| **Iteration 6** | ⏳ Pending | 0/3 | CLI | End-to-end conversions |
+| **Iteration 7** | ⏳ Pending | 0/2 | Polish | Production ready |
 
 **Legend:** ⏳ Pending | 🔄 In Progress | ✅ Complete | ❌ Blocked
 
----
-
-## Phase 0: Project Setup & Foundation
-
-**Goal:** Create workspace structure and core data model
-
-### 0.1 Workspace Setup
-- [ ] Create Cargo workspace with two crates
-  - [ ] Root `Cargo.toml` with workspace members
-  - [ ] `ledger-parser/` library crate
-  - [ ] `ledger-bridge-cli/` binary crate
-- [ ] Add dependencies to `ledger-parser/Cargo.toml`
-  - [ ] `serde = { version = "1.0", features = ["derive"] }`
-- [ ] Add dependencies to `ledger-bridge-cli/Cargo.toml`
-  - [ ] `clap = { version = "4.0", features = ["derive"] }`
-  - [ ] `ledger-parser = { path = "../ledger-parser" }`
-- [ ] **Test:** `cargo build` succeeds for workspace
-
-### 0.2 Data Model Implementation
-- [ ] Create `ledger-parser/src/model.rs`
-  - [ ] `Statement` struct with all fields
-  - [ ] `Transaction` struct with all fields
-  - [ ] `BalanceType` enum (Credit, Debit)
-  - [ ] `TransactionType` enum (Credit, Debit)
-  - [ ] Derive: `Debug, Clone, PartialEq, Serialize, Deserialize`
-- [ ] **Test:** Create sample `Statement` in unit test, verify serialization
-
-### 0.3 Error & Trait Definitions
-- [ ] Create `ledger-parser/src/error.rs`
-  - [ ] `ParseError` enum with variants
-  - [ ] Implement `std::fmt::Display`
-  - [ ] Implement `std::error::Error`
-  - [ ] Implement `From<std::io::Error>`
-- [ ] Create `ledger-parser/src/traits.rs`
-  - [ ] `Parser<T>` trait with `parse<R: BufRead>` method
-  - [ ] `Formatter<T>` trait with `format` method
-- [ ] Update `ledger-parser/src/lib.rs`
-  - [ ] Module declarations and public API exports
-- [ ] **Test:** `cargo build` succeeds, docs compile with `cargo doc`
+**Overall Progress:** 0/25 tasks complete (0%)
 
 ---
 
-## Phase 1: CSV Format Implementation
+## Iteration 0: Workspace Setup
 
-**Goal:** Parse and format CSV bank statements (simplest format first)
+**Goal:** Create project structure
 
-### 1.1 CSV Parser Structure
-- [ ] Create `ledger-parser/src/formats/csv.rs`
-  - [ ] `CsvParser` zero-sized struct
-  - [ ] Helper function: `parse_amount(s: &str) -> Result<f64>`
-  - [ ] Helper function: `parse_date(s: &str) -> Result<String>`
-- [ ] **Test:** Helpers work with sample inputs
+**Testable:** `cargo build` succeeds
 
-### 1.2 CSV Parser Implementation
-- [ ] Implement `Parser<Statement> for CsvParser`
-  - [ ] Read lines using `BufRead::lines()`
-  - [ ] Skip header/footer rows (identify transaction rows)
-  - [ ] Parse transaction rows into `Transaction` structs
-  - [ ] Extract opening/closing balances from summary rows
-  - [ ] Handle split debit/credit columns
-- [ ] **Test:** Parse minimal CSV (3 transactions) from in-memory string
+### Tasks
+- [ ] **0.1** Create Cargo workspace with `ledger-parser` and `ledger-bridge-cli` crates
+- [ ] **0.2** Add dependencies to library: `serde`, `csv`, `quick-xml`
 
-### 1.3 CSV Formatter Implementation
-- [ ] Implement `Formatter<Statement> for CsvParser`
-  - [ ] Generate CSV header row
-  - [ ] Format each transaction as CSV row
-  - [ ] Add summary rows (opening/closing balance)
-  - [ ] Handle proper quoting for description fields
-- [ ] **Test:** Format sample `Statement`, verify CSV structure
-
-### 1.4 CSV Round-Trip Test
-- [ ] Create integration test in `ledger-parser/src/formats/csv.rs`
-  - [ ] Parse CSV → Statement
-  - [ ] Format Statement → CSV
-  - [ ] Verify key fields preserved
-- [ ] **Test:** Round-trip conversion works
+**Test Command:**
+```bash
+cargo build
+```
 
 ---
 
-## Phase 2: MT940 Format Implementation
+## Iteration 1: Foundation - Shared Types
 
-**Goal:** Parse and format SWIFT MT940 messages
+**Goal:** Define shared data structures used across all formats
 
-### 2.1 MT940 Parser Structure
-- [ ] Create `ledger-parser/src/formats/mt940.rs`
-  - [ ] `Mt940Parser` zero-sized struct
-  - [ ] Helper: `extract_block4(input: &str) -> Result<&str>`
-  - [ ] Helper: `parse_date_yymmdd(date: &str) -> Result<String>`
-  - [ ] Helper: `parse_balance_line(tag: &str) -> Result<(...)>`
-  - [ ] Helper: `parse_transaction_line(tag61: &str, tag86: &str) -> Result<Transaction>`
-- [ ] **Test:** Each helper with sample MT940 snippets
+**Testable:** Types compile, unit tests pass
 
-### 2.2 MT940 Parser Implementation
-- [ ] Implement `Parser<Statement> for Mt940Parser`
-  - [ ] Read all using `read_to_string()` from BufRead
-  - [ ] Extract Block 4 content
-  - [ ] Parse `:25:` (account number)
-  - [ ] Parse `:60F:` (opening balance with C/D, date, currency, amount)
-  - [ ] Parse `:61:` + `:86:` pairs (transactions)
-  - [ ] Parse `:62F:` (closing balance)
-  - [ ] Handle multi-line `:86:` fields
-- [ ] **Test:** Parse minimal MT940 message (2 transactions)
+### Tasks
+- [ ] **1.1** Create `model.rs` with `Transaction`, `BalanceType`, `TransactionType`
+- [ ] **1.2** Create `error.rs` with `ParseError` enum (Display, Error, From<io::Error>)
+- [ ] **1.3** Create `lib.rs` with public API exports
 
-### 2.3 MT940 Formatter Implementation
-- [ ] Implement `Formatter<Statement> for Mt940Parser`
-  - [ ] Generate Block 4 structure
-  - [ ] Format `:20:` (reference)
-  - [ ] Format `:25:` (account)
-  - [ ] Format `:60F:` (opening balance)
-  - [ ] Format `:61:` + `:86:` pairs for each transaction
-  - [ ] Format `:62F:` (closing balance)
-- [ ] **Test:** Format sample `Statement`, verify MT940 structure
+**Test Command:**
+```bash
+cargo test --lib
+cargo doc --no-deps
+```
 
-### 2.4 MT940 Round-Trip & Conversion Test
-- [ ] Create integration test
-  - [ ] Parse MT940 → Statement → MT940 (round-trip)
-  - [ ] Parse MT940 → Statement → CSV (conversion)
-- [ ] **Test:** Both conversions work
+**Test Code:**
+```rust
+#[test]
+fn test_transaction_creation() {
+    let tx = Transaction {
+        booking_date: "2025-01-15".to_string(),
+        amount: 100.50,
+        transaction_type: TransactionType::Credit,
+        // ...
+    };
+    assert_eq!(tx.amount, 100.50);
+}
+```
 
 ---
 
-## Phase 3: CAMT.053 Format Implementation
+## Iteration 2: CSV Format Implementation
 
-**Goal:** Parse and format ISO 20022 CAMT.053 XML
+**Goal:** Complete CSV parsing and writing
 
-### 3.1 CAMT.053 Parser Structure
-- [ ] Create `ledger-parser/src/formats/camt053.rs`
-  - [ ] `Camt053Parser` zero-sized struct
-  - [ ] Helper: `extract_tag_text(xml: &str, tag: &str) -> Option<String>`
-  - [ ] Helper: `extract_attribute(tag_str: &str, attr: &str) -> Option<String>`
-  - [ ] Helper: `parse_balance(xml: &str, bal_type: &str) -> Result<(...)>`
-  - [ ] Helper: `parse_entry(entry_xml: &str) -> Result<Transaction>`
-- [ ] **Test:** Each helper with XML snippets
+**Testable:** Parse CSV, write CSV, round-trip works
 
-### 3.2 CAMT.053 Parser Implementation
-- [ ] Implement `Parser<Statement> for Camt053Parser`
-  - [ ] Read all XML using `read_to_string()`
-  - [ ] Extract account from `<Acct><Id><IBAN>` or `<Othr><Id>`
-  - [ ] Extract currency from `<Amt Ccy="XXX">` attribute
-  - [ ] Parse opening balance (OPBD type)
-  - [ ] Parse closing balance (CLBD type)
-  - [ ] Parse each `<Ntry>` into `Transaction`
-  - [ ] Extract counterparty (Dbtr for CRDT, Cdtr for DBIT)
-  - [ ] Extract description from `<RmtInf><Ustrd>` or `<AddtlTxInf>`
-- [ ] **Test:** Parse minimal CAMT.053 XML (2 transactions)
+### Tasks
+- [ ] **2.1** Create `formats/csv.rs` with `CsvStatement` struct (identical fields to future Mt940/Camt053)
+- [ ] **2.2** Implement `CsvStatement::from_read<R: Read>()`  using `csv` crate
+- [ ] **2.3** Implement `CsvStatement::write_to<W: Write>()` using `csv` crate
+- [ ] **2.4** Add unit tests (parse, write, error cases)
 
-### 3.3 CAMT.053 Formatter Implementation
-- [ ] Implement `Formatter<Statement> for Camt053Parser`
-  - [ ] Generate XML header with namespace
-  - [ ] Format `<BkToCstmrStmt>` structure
-  - [ ] Format `<Acct>` with IBAN and currency
-  - [ ] Format opening balance (`<Bal>` with OPBD type)
-  - [ ] Format closing balance (`<Bal>` with CLBD type)
-  - [ ] Format each transaction as `<Ntry>` with `<TxDtls>`
-  - [ ] Include counterparty and remittance info
-- [ ] **Test:** Format sample `Statement`, verify XML structure
+**Test Command:**
+```bash
+cargo test csv
+```
 
-### 3.4 CAMT.053 Round-Trip & Conversion Tests
-- [ ] Create integration tests
-  - [ ] Parse CAMT.053 → Statement → CAMT.053 (round-trip)
-  - [ ] Parse CAMT.053 → Statement → CSV
-  - [ ] Parse CAMT.053 → Statement → MT940
-  - [ ] Cross-format: CSV → MT940 → CAMT.053
-- [ ] **Test:** All format conversions work
+**Test Code:**
+```rust
+#[test]
+fn test_csv_parse() {
+    let csv_data = "Account,Currency,...\n...";
+    let mut reader = csv_data.as_bytes();
+    let result = CsvStatement::from_read(&mut reader);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_csv_write() {
+    let statement = CsvStatement { /* ... */ };
+    let mut output = Vec::new();
+    statement.write_to(&mut output).unwrap();
+    assert!(!output.is_empty());
+}
+```
 
 ---
 
-## Phase 4: CLI Application
+## Iteration 3: MT940 Format Implementation
 
-**Goal:** Build command-line interface for format conversion
+**Goal:** Complete MT940 parsing and writing (manual)
 
-### 4.1 CLI Argument Parsing
-- [ ] Create `ledger-bridge-cli/src/main.rs`
-  - [ ] Define `Cli` struct with clap derive
-  - [ ] Arguments: `--in-format`, `--out-format`
-  - [ ] Optional: `--input` (default stdin), `--output` (default stdout)
-  - [ ] Add version and help metadata
-- [ ] **Test:** `cargo run -- --help` displays usage
+**Testable:** Parse MT940, write MT940, round-trip works
 
-### 4.2 CLI Main Logic
-- [ ] Implement `main()` function
-  - [ ] Parse arguments
-  - [ ] Create `Box<dyn BufRead>` from input (file or stdin)
-  - [ ] Select parser based on `--in-format` (case-insensitive)
-  - [ ] Parse input to `Statement`
-  - [ ] Select formatter based on `--out-format`
-  - [ ] Format `Statement` to output string
-  - [ ] Write to file or stdout
-  - [ ] Handle all errors gracefully (stderr + exit code 1)
-- [ ] **Test:** Basic conversion: `echo "<data>" | cargo run -- --in-format csv --out-format mt940`
+### Tasks
+- [ ] **3.1** Create `formats/mt940.rs` with `Mt940` struct (same fields as CsvStatement)
+- [ ] **3.2** Implement `Mt940::from_read<R: Read>()` - manual tag-based parsing
+  - Block 4 extraction, tags: `:25:`, `:60F:`, `:61:`, `:86:`, `:62F:`
+  - YYMMDD date conversion (century inference)
+- [ ] **3.3** Implement `Mt940::write_to<W: Write>()` - generate MT940 format
+- [ ] **3.4** Add unit tests (parse, write, multi-line `:86:` handling)
 
-### 4.3 CLI Integration Testing
-- [ ] Test all format combinations
-  - [ ] CSV → MT940 (via stdin/stdout)
-  - [ ] MT940 → CAMT.053 (via files)
-  - [ ] CAMT.053 → CSV (mixed stdin/file)
-  - [ ] Test error handling (invalid format, missing file, parse errors)
-- [ ] **Test:** End-to-end CLI usage with real example files
+**Test Command:**
+```bash
+cargo test mt940
+```
+
+**Test Code:**
+```rust
+#[test]
+fn test_mt940_parse() {
+    let mt940_data = "{4:\n:20:REF\n:25:ACC123\n:60F:C250101USD1000,00\n...";
+    let mut reader = mt940_data.as_bytes();
+    let result = Mt940::from_read(&mut reader);
+    assert!(result.is_ok());
+}
+```
 
 ---
 
-## Phase 5: Testing & Validation
+## Iteration 4: CAMT.053 Format Implementation
 
-**Goal:** Comprehensive testing and validation
+**Goal:** Complete CAMT.053 parsing and writing
 
-### 5.1 Unit Test Coverage
-- [ ] Add error case tests for CSV parser
-- [ ] Add error case tests for MT940 parser
-- [ ] Add error case tests for CAMT.053 parser
-- [ ] Verify all parsers handle malformed input gracefully
-- [ ] **Test:** `cargo test` passes with >80% coverage
+**Testable:** Parse XML, write XML, round-trip works
 
-### 5.2 Real-World Data Testing
-- [ ] Test with `example_files/example_of_account_statement.csv`
-- [ ] Test with `example_files/mt 940 gs.mt940`
-- [ ] Test with `example_files/camt 053 danske bank.camt`
-- [ ] Document any format variations encountered
-- [ ] **Test:** All example files parse successfully
+### Tasks
+- [ ] **4.1** Create `formats/camt053.rs` with `Camt053` struct (same fields as Mt940/CsvStatement)
+- [ ] **4.2** Implement `Camt053::from_read<R: Read>()` using `quick-xml` event parsing
+  - Extract `<Acct>`, `<Bal>` (OPBD/CLBD), `<Ntry>` elements
+  - Handle namespaces, attributes (`Ccy="XXX"`)
+- [ ] **4.3** Implement `Camt053::write_to<W: Write>()` using `quick-xml` writer
+- [ ] **4.4** Add unit tests (parse, write, balance type filtering)
 
-### 5.3 Documentation & Cleanup
-- [ ] Add doc comments to all public API items
-- [ ] Generate documentation: `cargo doc --no-deps --open`
-- [ ] Update main `README.md` with usage examples
-- [ ] Verify all clippy lints pass: `cargo clippy -- -D warnings`
-- [ ] Format all code: `cargo fmt`
-- [ ] **Test:** Documentation builds, clippy/fmt clean
+**Test Command:**
+```bash
+cargo test camt053
+```
+
+**Test Code:**
+```rust
+#[test]
+fn test_camt053_parse() {
+    let xml = r#"<Document xmlns="..."><BkToCstmrStmt>..."#;
+    let mut reader = xml.as_bytes();
+    let result = Camt053::from_read(&mut reader);
+    assert!(result.is_ok());
+}
+```
 
 ---
 
-## Development Notes
+## Iteration 5: Format Conversions
 
-### KISS Principles Applied
-- Start with simplest format (CSV) before complex formats (MT940, CAMT.053)
-- Manual parsing using standard library (no heavy dependencies)
-- Each phase is independently testable
-- Incremental functionality (parse → format → convert)
+**Goal:** Implement `From` trait for all format pairs
 
-### Testing Strategy
-- Test after each subtask (granular validation)
-- Use in-memory test data for unit tests
-- Real files for integration testing
-- Both happy path and error cases
+**Testable:** Type conversions work, data preserved
 
-### Dependencies Strategy
-- Core: Only `serde` for data model
-- Optional: Add `csv` or `quick-xml` only if manual parsing becomes too complex
-- Keep it minimal and standard-library-first
+### Tasks
+- [ ] **5.1** Implement `From<Mt940> for Camt053` and `From<Camt053> for Mt940`
+- [ ] **5.2** Implement `From<CsvStatement> for Mt940` and `From<Mt940> for CsvStatement`
+- [ ] **5.3** Implement `From<CsvStatement> for Camt053` and `From<Camt053> for CsvStatement`
+
+**Test Command:**
+```bash
+cargo test --test integration_test
+```
+
+**Test Code:**
+```rust
+#[test]
+fn test_mt940_to_camt053_conversion() {
+    let mt940 = Mt940 { account_number: "123".to_string(), /* ... */ };
+    let camt053: Camt053 = mt940.into();
+    assert_eq!(camt053.account_number, "123");
+}
+
+#[test]
+fn test_round_trip_via_conversion() {
+    let original = Mt940 { /* ... */ };
+    let camt: Camt053 = original.clone().into();
+    let back: Mt940 = camt.into();
+    assert_eq!(original.account_number, back.account_number);
+}
+```
+
+---
+
+## Iteration 6: CLI Application
+
+**Goal:** Build working command-line interface
+
+**Testable:** End-to-end format conversions via CLI
+
+### Tasks
+- [ ] **6.1** Create `main.rs` with clap `Cli` struct (`--in-format`, `--out-format`, `--input`, `--output`)
+- [ ] **6.2** Implement `main()`: Read from file/stdin, parse, convert using `From` trait, write to file/stdout
+- [ ] **6.3** Add error handling (print to stderr, exit code 1)
+
+**Test Command:**
+```bash
+echo "test,data" | cargo run -- --in-format csv --out-format mt940
+cargo run -- --in-format mt940 --out-format camt053 --input test.mt940 --output test.xml
+```
+
+**Expected:** Successful conversions, proper error messages
+
+---
+
+## Iteration 7: Polish & Validation
+
+**Goal:** Production-ready code
+
+**Testable:** All quality checks pass
+
+### Tasks
+- [ ] **7.1** Add doc comments to all public items, test with real example files
+- [ ] **7.2** Run `cargo clippy -- -D warnings`, `cargo fmt --check`, fix all issues
+
+**Test Command:**
+```bash
+cargo test --all
+cargo clippy -- -D warnings
+cargo fmt --check
+cargo doc --no-deps --open
+```
+
+---
+
+## Quick Reference
+
+### After Each Iteration
+1. ✅ Run test command
+2. ✅ Verify testable output
+3. ✅ Update progress table
+4. ✅ Commit working code
+
+### Key Principles
+- **Incremental:** Each iteration adds new, testable functionality
+- **KISS:** Simple implementations first
+- **Tests:** Every iteration has clear test criteria
+- **Dependencies:** Use `csv` and `quick-xml` as specified in conventions.md
+
+### Conversion Flow
+```
+CSV ←→ Mt940 ←→ Camt053
+ ↑               ↓
+ └───────────────┘
+```
+
+All conversions use `From` trait:
+```rust
+let mt940 = Mt940::from_read(&mut reader)?;
+let camt053: Camt053 = mt940.into();
+camt053.write_to(&mut writer)?;
+```
 
 ---
 
 ## Completion Criteria
 
-✅ **Project Complete When:**
-1. All 6 phases marked complete
-2. All tests pass (`cargo test`)
-3. All clippy warnings resolved
-4. Documentation generated successfully
-5. CLI converts between all format pairs
-6. Example files parse without errors
+✅ **Project complete when:**
+- All 25 tasks checked
+- `cargo test --all` passes
+- `cargo clippy` clean
+- All format pairs convert successfully via CLI
+- Documentation generated
 
-**Estimated Iterations:** 6 phases × 3-4 tasks each = 18-24 testable increments
-
-
+**Total Iterations:** 8 (Setup → Foundation → 3 Formats → Conversions → CLI → Polish)
