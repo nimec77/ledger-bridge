@@ -162,13 +162,13 @@ impl Mt940 {
             let end = after_start
                 .find("-}")
                 .or_else(|| after_start.find('}'))
-                .ok_or_else(|| ParseError::Mt940Error("Block 4 not properly closed".to_string()))?;
+                .ok_or_else(|| ParseError::Mt940Error("Block 4 not properly closed".into()))?;
 
-            return Ok(after_start[..end].to_string());
+            return Ok(after_start[..end].into());
         }
 
         // If no block structure, assume entire content is Block 4 data
-        Ok(content.to_string())
+        Ok(content.into())
     }
 
     /// Parse tags from Block 4 content
@@ -193,7 +193,7 @@ impl Mt940 {
                     let value = &stripped[second_colon + 1..];
 
                     // Collect multi-line values (lines without leading colon are continuations)
-                    let mut full_value = value.to_string();
+                    let mut full_value: String = value.into();
                     i += 1;
 
                     while i < lines.len() {
@@ -206,7 +206,7 @@ impl Mt940 {
                         i += 1;
                     }
 
-                    tags.push((tag.to_string(), full_value));
+                    tags.push((tag.into(), full_value));
                     continue;
                 }
             }
@@ -221,8 +221,8 @@ impl Mt940 {
     fn extract_account_number(tags: &[(String, String)]) -> Result<String, ParseError> {
         tags.iter()
             .find(|(tag, _)| tag == "25")
-            .map(|(_, value)| value.trim().to_string())
-            .ok_or_else(|| ParseError::Mt940Error("Missing :25: account tag".to_string()))
+            .map(|(_, value)| value.trim().into())
+            .ok_or_else(|| ParseError::Mt940Error("Missing :25: account tag".into()))
     }
 
     /// Extract opening balance from :60F: or :60M: tag
@@ -232,7 +232,7 @@ impl Mt940 {
         let balance_tag = tags
             .iter()
             .find(|(tag, _)| tag == "60F" || tag == "60M")
-            .ok_or_else(|| ParseError::Mt940Error("Missing :60F: or :60M: tag".to_string()))?;
+            .ok_or_else(|| ParseError::Mt940Error("Missing :60F: or :60M: tag".into()))?;
 
         Self::parse_balance_line(&balance_tag.1)
     }
@@ -245,7 +245,7 @@ impl Mt940 {
         let balance_tag = tags
             .iter()
             .find(|(tag, _)| tag == "62F" || tag == "62M")
-            .ok_or_else(|| ParseError::Mt940Error("Missing :62F: or :62M: tag".to_string()))?;
+            .ok_or_else(|| ParseError::Mt940Error("Missing :62F: or :62M: tag".into()))?;
 
         let (amount, date, indicator, _) = Self::parse_balance_line(&balance_tag.1)?;
         Ok((amount, date, indicator))
@@ -259,25 +259,21 @@ impl Mt940 {
         let line = line.trim();
 
         if line.is_empty() {
-            return Err(ParseError::Mt940Error("Empty balance line".to_string()));
+            return Err(ParseError::Mt940Error("Empty balance line".into()));
         }
 
         // First char is C or D
         let indicator = match line.chars().next() {
             Some('C') => BalanceType::Credit,
             Some('D') => BalanceType::Debit,
-            _ => {
-                return Err(ParseError::Mt940Error(
-                    "Invalid balance indicator".to_string(),
-                ))
-            }
+            _ => return Err(ParseError::Mt940Error("Invalid balance indicator".into())),
         };
 
         let rest = &line[1..];
 
         // Next 6 chars are date (YYMMDD)
         if rest.len() < 6 {
-            return Err(ParseError::Mt940Error("Balance line too short".to_string()));
+            return Err(ParseError::Mt940Error("Balance line too short".into()));
         }
 
         let date_str = &rest[..6];
@@ -287,12 +283,10 @@ impl Mt940 {
 
         // Next 3 chars are currency
         if rest.len() < 3 {
-            return Err(ParseError::Mt940Error(
-                "Missing currency in balance".to_string(),
-            ));
+            return Err(ParseError::Mt940Error("Missing currency in balance".into()));
         }
 
-        let currency = rest[..3].to_string();
+        let currency = rest[..3].into();
         let amount_str = &rest[3..];
 
         let amount = Self::parse_amount(amount_str)?;
@@ -314,7 +308,7 @@ impl Mt940 {
 
                 // Look for following :86: tag (description)
                 let description = if i + 1 < tags.len() && tags[i + 1].0 == "86" {
-                    tags[i + 1].1.trim().to_string()
+                    tags[i + 1].1.trim().into()
                 } else {
                     String::new()
                 };
@@ -336,14 +330,12 @@ impl Mt940 {
         let line = line.trim();
 
         if line.is_empty() {
-            return Err(ParseError::Mt940Error("Empty transaction line".to_string()));
+            return Err(ParseError::Mt940Error("Empty transaction line".into()));
         }
 
         // Parse date (first 6 chars = YYMMDD)
         if line.len() < 6 {
-            return Err(ParseError::Mt940Error(
-                "Transaction line too short".to_string(),
-            ));
+            return Err(ParseError::Mt940Error("Transaction line too short".into()));
         }
 
         let date_str = &line[..6];
@@ -359,7 +351,7 @@ impl Mt940 {
         // Next char is C or D
         if rest.is_empty() {
             return Err(ParseError::Mt940Error(
-                "Missing transaction indicator".to_string(),
+                "Missing transaction indicator".into(),
             ));
         }
 
@@ -368,7 +360,7 @@ impl Mt940 {
             Some('D') => TransactionType::Debit,
             _ => {
                 return Err(ParseError::Mt940Error(
-                    "Invalid transaction indicator".to_string(),
+                    "Invalid transaction indicator".into(),
                 ))
             }
         };
@@ -382,7 +374,7 @@ impl Mt940 {
 
         if amount_end == 0 {
             return Err(ParseError::Mt940Error(
-                "Missing amount in transaction".to_string(),
+                "Missing amount in transaction".into(),
             ));
         }
 
@@ -391,7 +383,7 @@ impl Mt940 {
 
         // Rest is transaction type code and reference (variable format)
         let reference = if amount_end < rest.len() {
-            Some(rest[amount_end..].trim().to_string())
+            Some(rest[amount_end..].trim().into())
         } else {
             None
         };
@@ -401,7 +393,7 @@ impl Mt940 {
             value_date: None,
             amount,
             transaction_type,
-            description: description.to_string(),
+            description: description.into(),
             reference,
             counterparty_name: None,
             counterparty_account: None,
@@ -672,8 +664,8 @@ mod tests {
     #[test]
     fn test_mt940_write() {
         let statement = Mt940 {
-            account_number: "NL81ASNB9999999999".to_string(),
-            currency: "EUR".to_string(),
+            account_number: "NL81ASNB9999999999".into(),
+            currency: "EUR".into(),
             opening_balance: 444.29,
             opening_date: Mt940::parse_yymmdd_date("200101").unwrap(),
             opening_indicator: BalanceType::Credit,

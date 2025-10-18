@@ -12,14 +12,14 @@
 | **Iteration 1** | ✅ Complete | 3/3 | Foundation | Core types compile |
 | **Iteration 2** | ✅ Complete | 4/4 | CSV | Parse & write CSV |
 | **Iteration 3** | ✅ Complete | 4/4 | MT940 | Parse & write MT940 |
-| **Iteration 4** | ⏳ Pending | 0/4 | CAMT.053 | Parse & write XML |
+| **Iteration 4** | 🔄 In Progress | 1/4 | CAMT.053 | Parse & write XML |
 | **Iteration 5** | ⏳ Pending | 0/3 | Conversions | From trait works |
 | **Iteration 6** | ⏳ Pending | 0/3 | CLI | End-to-end conversions |
 | **Iteration 7** | ⏳ Pending | 0/2 | Polish | Production ready |
 
 **Legend:** ⏳ Pending | 🔄 In Progress | ✅ Complete | ❌ Blocked
 
-**Overall Progress:** 13/25 tasks complete (52%)
+**Overall Progress:** 14/25 tasks complete (56%)
 
 ## 🔍 Current Status Analysis
 
@@ -165,7 +165,7 @@ fn test_mt940_parse() {
 **Testable:** Parse XML, write XML, round-trip works
 
 ### Tasks
-- [ ] **4.1** Create `formats/camt053.rs` with `Camt053` struct (same fields as Mt940/CsvStatement)
+- [x] **4.1** Create `formats/camt053.rs` with `Camt053` struct (same fields as Mt940/CsvStatement)
 - [ ] **4.2** Implement `Camt053::from_read<R: Read>()` using `quick-xml` event parsing
   - Extract `<Acct>`, `<Bal>` (OPBD/CLBD), `<Ntry>` elements
   - Handle namespaces, attributes (`Ccy="XXX"`)

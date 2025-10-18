@@ -55,19 +55,19 @@ mod tests {
 
     #[test]
     fn test_parse_error_display() {
-        let error = ParseError::InvalidFormat("Test format".to_string());
+        let error = ParseError::InvalidFormat("Test format".into());
         assert_eq!(format!("{}", error), "Invalid format: Test format");
     }
 
     #[test]
     fn test_csv_error_display() {
-        let error = ParseError::CsvError("Invalid CSV structure".to_string());
+        let error = ParseError::CsvError("Invalid CSV structure".into());
         assert_eq!(format!("{}", error), "CSV error: Invalid CSV structure");
     }
 
     #[test]
     fn test_missing_field_error_display() {
-        let error = ParseError::MissingField("account_number".to_string());
+        let error = ParseError::MissingField("account_number".into());
         assert_eq!(
             format!("{}", error),
             "Missing required field: account_number"
@@ -77,8 +77,8 @@ mod tests {
     #[test]
     fn test_invalid_field_value_error_display() {
         let error = ParseError::InvalidFieldValue {
-            field: "amount".to_string(),
-            value: "invalid".to_string(),
+            field: "amount".into(),
+            value: "invalid".into(),
         };
         assert_eq!(
             format!("{}", error),
@@ -99,7 +99,7 @@ mod tests {
 
     #[test]
     fn test_error_debug() {
-        let error = ParseError::Mt940Error("Test error".to_string());
+        let error = ParseError::Mt940Error("Test error".into());
         let debug_str = format!("{:?}", error);
         assert!(debug_str.contains("Mt940Error"));
         assert!(debug_str.contains("Test error"));

@@ -58,7 +58,7 @@ impl CsvStatement {
         reader.read_to_string(&mut content)?;
 
         if content.is_empty() {
-            return Err(ParseError::CsvError("Empty input".to_string()));
+            return Err(ParseError::CsvError("Empty input".into()));
         }
 
         // Use csv crate with flexible parsing options
@@ -73,7 +73,7 @@ impl CsvStatement {
 
         if records.len() < 12 {
             return Err(ParseError::CsvError(
-                "CSV too short - missing required sections".to_string(),
+                "CSV too short - missing required sections".into(),
             ));
         }
 
@@ -144,7 +144,7 @@ impl CsvStatement {
     fn extract_account_number(records: &[csv::StringRecord]) -> Result<String, ParseError> {
         if records.len() <= 5 {
             return Err(ParseError::CsvError(
-                "Missing account number in header".to_string(),
+                "Missing account number in header".into(),
             ));
         }
 
@@ -154,22 +154,20 @@ impl CsvStatement {
                 let trimmed = field.trim();
                 // Account number format: typically 20 digits
                 if trimmed.len() == 20 && trimmed.chars().all(|c| c.is_ascii_digit()) {
-                    return Ok(trimmed.to_string());
+                    return Ok(trimmed.into());
                 }
             }
         }
 
         Err(ParseError::CsvError(
-            "Account number not found in header".to_string(),
+            "Account number not found in header".into(),
         ))
     }
 
     /// Extract currency from header section
     fn extract_currency(records: &[csv::StringRecord]) -> Result<String, ParseError> {
         if records.len() <= 8 {
-            return Err(ParseError::CsvError(
-                "Missing currency in header".to_string(),
-            ));
+            return Err(ParseError::CsvError("Missing currency in header".into()));
         }
 
         // Currency is in line 9 (index 8), look for "Российский рубль" or currency code
@@ -178,18 +176,18 @@ impl CsvStatement {
             let trimmed = field.trim();
             if trimmed.contains("Российский рубль") || trimmed.contains("рубль")
             {
-                return Ok("RUB".to_string());
+                return Ok("RUB".into());
             }
             if trimmed.contains("доллар") || trimmed.contains("USD") {
-                return Ok("USD".to_string());
+                return Ok("USD".into());
             }
             if trimmed.contains("евро") || trimmed.contains("EUR") {
-                return Ok("EUR".to_string());
+                return Ok("EUR".into());
             }
         }
 
         // Default to RUB if not found
-        Ok("RUB".to_string())
+        Ok("RUB".into())
     }
 
     /// Find transaction start and footer start positions
@@ -205,9 +203,7 @@ impl CsvStatement {
         }
 
         let transaction_start = transaction_start.ok_or_else(|| {
-            ParseError::CsvError(
-                "Transaction section not found (missing 'Дата проводки')".to_string(),
-            )
+            ParseError::CsvError("Transaction section not found (missing 'Дата проводки')".into())
         })?;
 
         // Footer starts at "б/с" marker
@@ -248,17 +244,13 @@ impl CsvStatement {
     /// Parse a single transaction record
     fn parse_transaction_record(record: &csv::StringRecord) -> Result<Transaction, ParseError> {
         // Get field values by index
-        let get_field = |idx: usize| -> String {
-            record
-                .get(idx)
-                .map(|s| s.trim().to_string())
-                .unwrap_or_default()
-        };
+        let get_field =
+            |idx: usize| -> String { record.get(idx).map(|s| s.trim().into()).unwrap_or_default() };
 
         // Extract date (column 1, index 1)
         let date_str = get_field(1);
         if date_str.is_empty() {
-            return Err(ParseError::CsvError("Empty date field".to_string()));
+            return Err(ParseError::CsvError("Empty date field".into()));
         }
         let booking_date = Self::parse_date(&date_str)?;
 
@@ -276,9 +268,7 @@ impl CsvStatement {
         } else if credit_amount > 0.0 {
             (credit_amount, TransactionType::Credit)
         } else {
-            return Err(ParseError::CsvError(
-                "Transaction has no amount".to_string(),
-            ));
+            return Err(ParseError::CsvError("Transaction has no amount".into()));
         };
 
         // Extract document number (around index 14)
@@ -368,9 +358,7 @@ impl CsvStatement {
             }
         }
 
-        Err(ParseError::CsvError(
-            "Opening balance not found".to_string(),
-        ))
+        Err(ParseError::CsvError("Opening balance not found".into()))
     }
 
     /// Extract closing balance from footer section
@@ -400,11 +388,7 @@ impl CsvStatement {
                                 // Try to extract date (often at end of row)
                                 let date_str = Self::extract_date_from_record(record)?;
 
-                                return Ok((
-                                    amount.abs(),
-                                    Self::parse_date(&date_str)?,
-                                    indicator,
-                                ));
+                                return Ok((amount.abs(), Self::parse_date(&date_str)?, indicator));
                             }
                         }
                     }
@@ -412,9 +396,7 @@ impl CsvStatement {
             }
         }
 
-        Err(ParseError::CsvError(
-            "Closing balance not found".to_string(),
-        ))
+        Err(ParseError::CsvError("Closing balance not found".into()))
     }
 
     /// Extract date from a record (looks for date patterns)
@@ -437,7 +419,7 @@ impl CsvStatement {
                 }
             }
         }
-        Err(ParseError::CsvError("Date not found".to_string()))
+        Err(ParseError::CsvError("Date not found".into()))
     }
 
     /// Write header section
@@ -669,8 +651,8 @@ mod tests {
     #[test]
     fn test_csv_statement_creation() {
         let statement = CsvStatement {
-            account_number: "40702810440000030888".to_string(),
-            currency: "RUB".to_string(),
+            account_number: "40702810440000030888".into(),
+            currency: "RUB".into(),
             opening_balance: 1332.54,
             opening_date: CsvStatement::parse_date("2024-01-01").unwrap(),
             opening_indicator: BalanceType::Credit,

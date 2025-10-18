@@ -38,13 +38,13 @@ mod tests {
     fn test_transaction_creation() {
         let tx = Transaction {
             booking_date: utils::parse_date("2025-01-15").unwrap(),
-            value_date: Some("2025-01-15".to_string()),
+            value_date: Some("2025-01-15".into()),
             amount: 100.50,
             transaction_type: TransactionType::Credit,
-            description: "Payment received".to_string(),
-            reference: Some("REF123".to_string()),
-            counterparty_name: Some("John Doe".to_string()),
-            counterparty_account: Some("IBAN123".to_string()),
+            description: "Payment received".into(),
+            reference: Some("REF123".into()),
+            counterparty_name: Some("John Doe".into()),
+            counterparty_account: Some("IBAN123".into()),
         };
         assert_eq!(tx.amount, 100.50);
         assert_eq!(tx.transaction_type, TransactionType::Credit);
@@ -75,7 +75,7 @@ mod tests {
             value_date: None,
             amount: 250.75,
             transaction_type: TransactionType::Debit,
-            description: "Purchase".to_string(),
+            description: "Purchase".into(),
             reference: None,
             counterparty_name: None,
             counterparty_account: None,
