@@ -9,16 +9,15 @@
 ### Module Structure
 - Use **Rust 2018+ style** - No `mod.rs` files
 - One module per format in `formats/` directory
-- Keep parsers and formatters in the same file (per format)
-- Separate concerns: data model ↔ traits ↔ implementations
+- Each format module contains: struct definition + `from_read()` + `write_to()` + `From` trait implementations
+- Separate concerns: shared types ↔ format-specific structs ↔ conversions
 
 ### File Layout
 ```
 lib.rs        → Public API exports, module declarations
-model.rs      → Pure data structures (no logic)
+model.rs      → Shared types (Transaction, BalanceType, TransactionType)
 error.rs      → Error types with Display + Error traits
-traits.rs     → Parser and Formatter trait definitions
-formats/*.rs  → Format implementations (parser + formatter together)
+formats/*.rs  → Format-specific structs (Mt940, Camt053, CsvStatement) with methods
 ```
 
 ---
@@ -40,24 +39,36 @@ formats/*.rs  → Format implementations (parser + formatter together)
 
 ---
 
-## Trait Implementation
+## Format Implementation
 
-### Parser Trait
-- Must use `std::io::BufRead` or `std::io::Read` (wrapped in `BufReader`)
-- Generic over type `T`, not tied to specific data structures
-- Associated error type: `type Error = ParseError`
-
-### Formatter Trait
-- Returns `Result<String, ParseError>`
-- Generic over type `T`
-- No I/O operations (formatters produce strings)
+### Required Methods
+Each format struct must implement:
+1. **`from_read()`** - Parse from any `Read` source
+2. **`write_to()`** - Write to any `Write` destination
+3. **`From` trait** - Convert from/to other format structs
 
 ### Implementation Pattern
 ```rust
-impl Parser<Statement> for CsvParser {
-    type Error = ParseError;
-    fn parse<R: BufRead>(&self, reader: R) -> Result<Statement, Self::Error> {
-        // Implementation using BufRead
+impl Mt940 {
+    /// Parse from any Read source (file, stdin, buffer)
+    pub fn from_read<R: std::io::Read>(reader: &mut R) -> Result<Self, ParseError> {
+        // Read data using reader.read_to_string() or appropriate method
+        // Parse format-specific structure
+        // Return Self
+    }
+    
+    /// Write to any Write destination (file, stdout, buffer)
+    pub fn write_to<W: std::io::Write>(&self, writer: &mut W) -> Result<(), ParseError> {
+        // Format self as output string/bytes
+        // Write using writer.write_all()
+        // Return Ok(()) or error
+    }
+}
+
+/// Type conversions between formats
+impl From<Camt053> for Mt940 {
+    fn from(camt: Camt053) -> Self {
+        // Field-by-field conversion
     }
 }
 ```
@@ -81,7 +92,8 @@ impl Parser<Statement> for CsvParser {
 - All public types must derive:
   - `Debug`, `Clone`, `PartialEq` (testing)
   - `Serialize`, `Deserialize` (serde integration)
-- Use zero-sized types (empty structs) for parsers/formatters
+- Format structs have identical field structure (enables simple `From` implementations)
+- Shared types (Transaction, BalanceType) used across all formats
 
 ---
 
@@ -91,21 +103,35 @@ impl Parser<Statement> for CsvParser {
 - ✅ All **public** items need doc comments (`///`)
 - ✅ Document **why** decisions were made, not just what
 - ✅ Include examples in docs where helpful
-- ✅ Document trait implementation contracts
+- ✅ Document method contracts (what Read/Write expects)
 
 ### Style
 ```rust
-/// Parses CSV bank statements into unified Statement format.
+/// CSV bank statement structure.
 ///
-/// # Errors
-/// Returns `ParseError::CsvError` if the CSV structure is invalid.
-///
-/// # Example
-/// ```
-/// let reader = BufReader::new(csv_data.as_bytes());
-/// let statement = CsvParser.parse(reader)?;
-/// ```
-pub struct CsvParser;
+/// Parses from and writes to CSV format using the `csv` crate.
+/// Fields are identical to Mt940/Camt053 for seamless conversions.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CsvStatement {
+    pub account_number: String,
+    // ... fields
+}
+
+impl CsvStatement {
+    /// Parse CSV from any Read source.
+    ///
+    /// # Errors
+    /// Returns `ParseError::CsvError` if the CSV structure is invalid.
+    ///
+    /// # Example
+    /// ```
+    /// let mut reader = csv_data.as_bytes();
+    /// let statement = CsvStatement::from_read(&mut reader)?;
+    /// ```
+    pub fn from_read<R: std::io::Read>(reader: &mut R) -> Result<Self, ParseError> {
+        // Implementation
+    }
+}
 ```
 
 ---
@@ -113,9 +139,9 @@ pub struct CsvParser;
 ## Testing
 
 ### Coverage Requirements
-- Unit tests for each parser (happy path + error cases)
-- Unit tests for each formatter (happy path + error cases)
-- Integration tests for format conversions
+- Unit tests for each format's `from_read()` (happy path + error cases)
+- Unit tests for each format's `write_to()` (happy path + error cases)
+- Integration tests for `From` trait conversions between formats
 - Test error cases, not just success paths
 
 ### Test Organization
@@ -129,9 +155,25 @@ pub struct CsvParser;
 #[test]
 fn test_parse_csv() {
     let input = "Account,Currency,...\n...";
-    let reader = BufReader::new(input.as_bytes());
-    let result = CsvParser.parse(reader);
+    let mut reader = input.as_bytes();
+    let result = CsvStatement::from_read(&mut reader);
     assert!(result.is_ok());
+}
+
+#[test]
+fn test_write_csv() {
+    let statement = CsvStatement { /* ... */ };
+    let mut output = Vec::new();
+    let result = statement.write_to(&mut output);
+    assert!(result.is_ok());
+    assert!(!output.is_empty());
+}
+
+#[test]
+fn test_conversion() {
+    let mt940 = Mt940 { /* ... */ };
+    let camt053: Camt053 = mt940.into();
+    assert_eq!(camt053.account_number, "...");
 }
 ```
 
@@ -139,16 +181,21 @@ fn test_parse_csv() {
 
 ## Dependencies
 
-### Allowed Libraries
-- **Required**: `serde` (with derive feature) - Data structure serialization
+### Required Libraries
+- **`serde`** (with derive feature) - Data structure serialization
+- **`csv`** (v1.3) - CSV parsing with Read/Write support (Trust Score: 9.1)
+- **`quick-xml`** (v0.31) - XML parsing for CAMT.053 (Trust Score: 9.2)
 - **CLI only**: `clap` (with derive feature) - Argument parsing
-- **Optional**: Simple helpers like `csv`, `quick-xml` (only if needed, keep it simple)
+
+### Parsing Approach
+- **CSV**: Use `csv` crate with `Reader::from_reader()` and `Writer::from_writer()`
+- **MT940**: Manual parsing (educational value, demonstrates text processing)
+- **CAMT.053**: Use `quick-xml` with event-based parsing or Serde deserialization
 
 ### Dependency Rules
-- Avoid heavy dependencies
-- No parser combinators unless needed for learning
-- Prefer manual parsing for simple formats
-- Standard library traits preferred over external abstractions
+- Standard library `Read`/`Write` traits are primary abstractions
+- External libraries must support Read/Write traits
+- Manual parsing acceptable when educational
 
 ---
 
@@ -171,36 +218,41 @@ fn test_parse_csv() {
 
 ## I/O Patterns
 
-### Input Handling
-- All parsers accept `impl BufRead` or `impl Read`
-- Wrap `Read` with `BufReader::new()` for buffering
-- Support stdin, files, in-memory buffers (via BufRead abstraction)
-- Line-by-line reading for CSV and MT940
-- Read-all acceptable for small XML files
+### Input Handling (Read Trait)
+- All `from_read()` methods accept `&mut R` where `R: std::io::Read`
+- Works with: files, stdin, in-memory buffers, network streams
+- Use `read_to_string()` for text formats, buffered reading for large files
+- Library uses Read abstraction; caller provides the actual source
 
-### Output Handling
-- Formatters return `Result<String, ParseError>`
-- CLI decides where to write (stdout or file)
-- No direct file I/O in library formatters
+### Output Handling (Write Trait)
+- All `write_to()` methods accept `&mut W` where `W: std::io::Write`
+- Works with: files, stdout, in-memory buffers (Vec<u8>), network streams
+- Use `write_all()` for complete output, `write_fmt!()` for formatted output
+- Library uses Write abstraction; caller provides the actual destination
+
+### Benefits
+- Single implementation works with any Read/Write source
+- No code duplication for files vs stdin/stdout
+- Demonstrates standard library trait power
 
 ---
 
 ## Naming Conventions
 
 ### Types
-- Parsers: `CsvParser`, `Mt940Parser`, `Camt053Parser` (zero-sized structs)
-- Data: `Statement`, `Transaction`, `BalanceType`, `TransactionType`
+- Format structs: `Mt940`, `Camt053`, `CsvStatement`
+- Shared data: `Transaction`, `BalanceType`, `TransactionType`
 - Errors: `ParseError` (single unified enum)
 
 ### Methods
-- Parsing: `fn parse<R: BufRead>(&self, reader: R) -> Result<T, Self::Error>`
-- Formatting: `fn format(&self, data: &T) -> Result<String, Self::Error>`
+- Parsing: `fn from_read<R: Read>(reader: &mut R) -> Result<Self, ParseError>`
+- Formatting: `fn write_to<W: Write>(&self, writer: &mut W) -> Result<(), ParseError>`
 
 ### Variables
 - Use descriptive names (no single-letter except loop indices)
-- `reader` for BufRead/Read sources
-- `statement` for parsed Statement instances
-- `output` for formatted strings
+- `reader` for Read sources
+- `writer` for Write destinations
+- Format-specific variable names: `mt940`, `camt053`, `csv_statement`
 
 ---
 
@@ -239,17 +291,18 @@ cat input.csv | ledger-bridge --in-format csv --out-format camt053 > output.xml
 
 ## Learning Focus
 
-### Priorities
-1. **Understand trait-based polymorphism** - Implement traits manually
-2. **Standard library I/O patterns** - Use `BufRead`, `Read`, `Write` traits
-3. **Error handling** - Explicit `Result` types, custom error implementations
-4. **Type conversions** - Use `From`/`Into`, `TryFrom`/`TryInto` traits
+### Core Objectives
+1. **Standard library I/O traits** - Master `Read` and `Write` for flexible I/O
+2. **Type conversions with From trait** - Implement `From` for format conversions
+3. **Static polymorphism** - Generic functions without runtime overhead
+4. **Error handling** - Explicit `Result` types, custom error implementations
+5. **Practical parsing** - Real-world formats with appropriate libraries
 
 ### Write Verbose Code When
-- It aids understanding of trait mechanics
+- It demonstrates Read/Write trait benefits
 - Makes error handling explicit
-- Clarifies type conversions
-- Documents design decisions
+- Clarifies type conversions between formats
+- Documents parsing strategy decisions
 
 ---
 
