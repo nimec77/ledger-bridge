@@ -1,27 +1,6 @@
-# Development Conventions - Ledger Bridge
-
-> Essential code development rules for this project. See [@vision.md](vision.md) for complete technical blueprint.
-
 ---
-
-## Code Organization
-
-### Module Structure
-- Use **Rust 2018+ style** - No `mod.rs` files
-- One module per format in `formats/` directory
-- Each format module contains: struct definition + `from_read()` + `write_to()` + `From` trait implementations
-- Separate concerns: shared types ↔ format-specific structs ↔ conversions
-
-### File Layout
-```
-lib.rs        → Public API exports, module declarations
-model.rs      → Shared types (Transaction, BalanceType, TransactionType)
-error.rs      → Error types with Display + Error traits
-formats/*.rs  → Format-specific structs (Mt940, Camt053, CsvStatement) with methods
-```
-
+alwaysApply: true
 ---
-
 ## Error Handling (Critical)
 
 ### Mandatory Rules

@@ -8,7 +8,7 @@
 
 | Iteration | Status | Tasks | Focus | Testable Output |
 |-----------|--------|-------|-------|-----------------|
-| **Iteration 0** | ⏳ Pending | 0/2 | Setup | Workspace builds |
+| **Iteration 0** | ✅ Complete | 2/2 | Setup | Workspace builds |
 | **Iteration 1** | ⏳ Pending | 0/3 | Foundation | Core types compile |
 | **Iteration 2** | ⏳ Pending | 0/4 | CSV | Parse & write CSV |
 | **Iteration 3** | ⏳ Pending | 0/4 | MT940 | Parse & write MT940 |
@@ -19,7 +19,7 @@
 
 **Legend:** ⏳ Pending | 🔄 In Progress | ✅ Complete | ❌ Blocked
 
-**Overall Progress:** 0/25 tasks complete (0%)
+**Overall Progress:** 2/25 tasks complete (8%)
 
 ---
 
@@ -30,8 +30,8 @@
 **Testable:** `cargo build` succeeds
 
 ### Tasks
-- [ ] **0.1** Create Cargo workspace with `ledger-parser` and `ledger-bridge-cli` crates
-- [ ] **0.2** Add dependencies to library: `serde`, `csv`, `quick-xml`
+- [x] **0.1** Create Cargo workspace with `ledger-parser` and `ledger-bridge-cli` crates
+- [x] **0.2** Add dependencies to library: `serde`, `csv`, `quick-xml`
 
 **Test Command:**
 ```bash

@@ -1,0 +1,3 @@
+[workspace]
+members = ["ledger-parser", "ledger-bridge-cli"]
+resolver = "2"
