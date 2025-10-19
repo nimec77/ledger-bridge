@@ -519,7 +519,8 @@ mod tests {
 
     #[test]
     fn test_parse_yymmdd_date_century_inference() {
-        let result = Mt940Statement::parse_yymmdd_date("230101").expect("Expected successful parse");
+        let result =
+            Mt940Statement::parse_yymmdd_date("230101").expect("Expected successful parse");
         assert_eq!(result.format("%Y-%m-%d").to_string(), "2023-01-01");
     }
 
