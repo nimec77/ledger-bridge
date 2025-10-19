@@ -14,8 +14,11 @@
 
 #### Parser Library (`ledger-parser`)
 
-**Core dependency:**
+**Core dependencies:**
 - `serde` (with `derive` feature) - Serialization/deserialization framework
+- `chrono` - Date and time library for `DateTime<FixedOffset>` types
+- `csv` (v1.3) - CSV parsing with Read/Write support (Trust Score: 9.1)
+- `quick-xml` (v0.31) - XML parsing for CAMT.053 (Trust Score: 9.2)
 
 **Why serde?**
 - Enables `Serialize`/`Deserialize` traits on data structures
@@ -31,22 +34,31 @@
 - This demonstrates how standard library traits enable code reuse across different data sources (files, stdin, buffers, network)
 - No need for separate implementations for each I/O source
 
-**Recommended parsing libraries:**
+**Why chrono?**
+- Provides robust date and time types with timezone support
+- `DateTime<FixedOffset>` enables proper date handling across formats
+- Parsing utilities for various date formats (ISO 8601, YYMMDD, etc.)
+- Serde integration for serialization/deserialization
+- Industry standard for Rust date/time handling
+
+**Parsing libraries in use:**
 - **`csv`** - Fast, flexible CSV reader/writer with excellent Read/Write support (Trust Score: 9.1)
-  - Supports Serde for automatic struct serialization/deserialization
+  - Used for Russian Sberbank CSV format parsing
+  - Supports flexible field counts and multi-line cells
   - Efficient buffering and memory usage
   - Handles quoted fields, custom delimiters, and edge cases
   
 - **`quick-xml`** - High-performance XML parser for CAMT.053 (Trust Score: 9.2)
+  - Used for ISO 20022 CAMT.053 XML format
   - Native Read/Write trait support
-  - Event-based parsing (similar to SAX)
-  - Serde integration for automatic struct deserialization
-  - Excellent for ISO 20022 XML formats
+  - Event-based parsing with custom state management
+  - Excellent for complex nested XML structures
   
-- **Manual parsing for MT940** - String processing recommended
+- **Manual parsing for MT940** - String processing with custom logic
   - MT940 format is intentionally complex and educational
-  - Requires understanding of tag-based parsing
+  - Demonstrates tag-based parsing and multi-line field handling
   - Good practice for manual text processing
+  - Shows how to handle YYMMDD dates with century inference
 
 **CSV Parsing (using `csv` crate):**
 - Use `csv::Reader::from_reader()` to read from any `impl Read`
@@ -170,38 +182,62 @@ With Serialize/Deserialize on all data structures:
 ```
 ledger-bridge/
 ├── Cargo.toml              # Workspace root
-├── README.md
-├── idea.md
-├── vision.md
+├── Cargo.lock              # Dependency lock file
+├── README.md               # Project overview and usage guide
+├── conventions.md          # Coding standards and rules
+├── vision.md               # Technical vision (this document)
+├── idea.md                 # Original project concept
+├── parsing_library_options.md  # Library research notes
 │
-├── example_files/          # Real-world format examples (for reference)
+├── doc/                    # Project documentation
+│   ├── tasklist.md        # Development task tracking
+│   └── workflow.md        # Development workflow guidelines
+│
+├── example_files/          # Real-world format examples (for testing/reference)
 │   ├── sources.md         # Source attribution for examples
-│   ├── *.camt             # CAMT.053 XML examples
-│   ├── *.mt940            # MT940 SWIFT message examples
-│   └── *.csv              # CSV statement examples
+│   ├── camt 053 danske bank.camt      # CAMT.053 XML examples
+│   ├── camt 053 treasurease.camt
+│   ├── mt 940 gs.mt940                # MT940 SWIFT message examples
+│   ├── MT_940 aiophotoz.mt940
+│   ├── MT_940 oracle.mt940
+│   ├── MT940 github 1.mt940
+│   └── example_of_account_statement.csv  # CSV statement example
 │
 ├── ledger-parser/          # Library crate
-│   ├── Cargo.toml         # Dependencies: serde with derive feature
+│   ├── Cargo.toml         # Dependencies: serde, chrono, csv, quick-xml
+│   ├── README.md          # Library documentation
 │   ├── src/
-│   │   ├── lib.rs         # Public API exports
+│   │   ├── lib.rs         # Public API exports and module declarations
+│   │   ├── model.rs       # Shared data model (Transaction, BalanceType, TransactionType)
+│   │   ├── error.rs       # Unified ParseError type with trait implementations
 │   │   │
-│   │   ├── model.rs       # Data model (Transaction, Statement)
-│   │   ├── error.rs       # Error types
-│   │   ├── traits.rs      # Parser & Formatter trait definitions
-│   │   │
-│   │   └── formats/       # Format implementations
-│   │       ├── csv.rs
-│   │       ├── mt940.rs
-│   │       └── camt053.rs
+│   │   └── formats/       # Format implementations (private module)
+│   │       ├── csv_statement.rs          # CsvStatement struct and methods
+│   │       ├── mt940_statement.rs        # Mt940Statement struct and methods
+│   │       ├── camt053_statement.rs      # Camt053Statement struct and methods
+│   │       │
+│   │       ├── camt053_statement/        # CAMT.053 parsing submodule
+│   │       │   ├── parser.rs             # Event-based XML parser
+│   │       │   ├── writer.rs             # XML writer implementation
+│   │       │   ├── elements.rs           # XML element structures
+│   │       │   ├── scratch.rs            # Temporary parsing state
+│   │       │   ├── camt053_utils.rs      # CAMT-specific utilities
+│   │       │   └── camt053_const.rs      # Constants and tag names
+│   │       │
+│   │       ├── csv_conversions.rs        # From trait: CsvStatement ↔ others
+│   │       ├── mt940_conversions.rs      # From trait: Mt940Statement ↔ others
+│   │       ├── camt053_conversions.rs    # From trait: Camt053Statement ↔ others
+│   │       │
+│   │       └── utils.rs                  # Common parsing utilities (dates, amounts)
 │   │
 │   └── tests/
-│       ├── integration_test.rs
-│       └── conversion_test.rs
+│       └── integration_test.rs           # Format conversion integration tests
 │
 └── ledger-bridge-cli/      # CLI binary crate
     ├── Cargo.toml         # Dependencies: clap, ledger-parser
+    ├── README.md          # CLI usage documentation
     └── src/
-        └── main.rs
+        └── main.rs        # CLI application with Read/Write trait usage
 ```
 
 ### Cargo.toml Examples
@@ -222,13 +258,12 @@ edition = "2021"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
+chrono = { version = "0.4", features = ["serde"] }
+serde_json = "1.0"  # For testing and debug serialization
 
 # Format-specific parsing libraries
 csv = "1.3"           # CSV parsing with Read/Write support
-quick-xml = "0.31"    # XML parsing for CAMT.053 with Serde integration
-
-# Optional: serde_xml_rs as alternative for XML deserialization
-# serde-xml-rs = "0.6"
+quick-xml = "0.31"    # XML parsing for CAMT.053 with event-based API
 ```
 
 **CLI (`ledger-bridge-cli/Cargo.toml`):**
@@ -245,39 +280,118 @@ clap = { version = "4.0", features = ["derive"] }
 
 ### Module Organization
 
-**Modern Rust 2018+ structure** - No `mod.rs` files
+**Modern Rust 2018+ structure** - No `mod.rs` files, using inline module declarations
 
 #### `ledger-parser/src/lib.rs`
-- Public API exports
-- Re-exports core types and traits
-- Module declarations
+- Public API exports via `pub use` statements
+- Re-exports: `ParseError`, `Mt940Statement`, `Camt053Statement`, `CsvStatement`
+- Re-exports shared types: `Transaction`, `BalanceType`, `TransactionType`
+- Module declarations: `pub mod error`, `pub mod model`, `mod formats`
+- Comprehensive crate-level documentation with examples
 
 #### `ledger-parser/src/model.rs`
-- Shared data types: `Transaction`, `TransactionType`, `BalanceType`
-- Pure data structures used across all formats
-- Implements: `Clone`, `Debug`, `PartialEq`, `Serialize`, `Deserialize`
+- Shared data types used across all formats:
+  - `Transaction` - Individual transaction entry with booking_date as `DateTime<FixedOffset>`
+  - `TransactionType` - Credit/Debit enum for transaction direction
+  - `BalanceType` - Credit/Debit enum for balance indicators
+- Pure data structures with no business logic
+- Derives: `Debug`, `Clone`, `PartialEq`, `Serialize`, `Deserialize`
+- Includes unit tests for basic functionality and serialization
 
 #### `ledger-parser/src/error.rs`
-- Custom error enums (`ParseError`)
-- Implements `std::error::Error` and `std::fmt::Display`
-- Implements `From<std::io::Error>` for automatic conversion
+- Unified `ParseError` enum covering all error cases:
+  - General errors: `InvalidFormat`, `MissingField`, `InvalidFieldValue`
+  - Format-specific: `CsvError`, `Mt940Error`, `Camt053Error`
+  - I/O errors: `IoError`
+- Implements `std::error::Error` trait (standard error handling)
+- Implements `std::fmt::Display` trait (user-friendly messages)
+- Implements `From<std::io::Error>` for automatic I/O error conversion
+- Implements `From<csv::Error>` for automatic CSV error conversion
+- Includes comprehensive unit tests
 
-#### `ledger-parser/src/formats/*.rs`
-- One file per format (csv.rs, mt940.rs, camt053.rs)
-- Each defines format-specific struct (CsvStatement, Mt940, Camt053)
-- Each implements:
-  - `from_read<R: Read>(&mut R) -> Result<Self, ParseError>` - Parsing
-  - `write_to<W: Write>(&mut W) -> Result<(), ParseError>` - Formatting
-  - `From<OtherFormat>` - Type conversions
-- Format-specific logic isolated
-- Uses external crates where appropriate (csv, quick-xml)
+#### `ledger-parser/src/formats/` (private module)
+
+**Format Implementation Files:**
+- `csv_statement.rs` - Complete CsvStatement implementation
+  - Russian Sberbank CSV format parser
+  - Handles multi-line headers, transaction rows, footer with balances
+  - Uses `csv` crate with flexible parsing
+  - Includes inline unit tests and real file parsing tests
+  
+- `mt940_statement.rs` - Complete Mt940Statement implementation
+  - SWIFT MT940 message format parser (manual implementation)
+  - Block extraction and tag-based parsing
+  - YYMMDD date parsing with century inference
+  - Multi-line field handling (`:86:` tags)
+  - Includes inline unit tests and real file parsing tests
+  
+- `camt053_statement.rs` - Main Camt053Statement struct
+  - ISO 20022 CAMT.053 XML format
+  - Delegates parsing to submodule
+  - Includes comprehensive unit tests including round-trip tests
+
+**CAMT.053 Submodule (`camt053_statement/`):**
+- `parser.rs` - Event-based XML parser using quick-xml
+  - `CamtParser` struct with state management
+  - Handles nested XML structures
+  - Extracts balances (OPBD/CLBD) and transactions
+  
+- `writer.rs` - XML writer for CAMT.053 output
+  - `CamtWriter` struct generates ISO 20022 XML
+  - Proper namespace and structure generation
+  
+- `elements.rs` - Intermediate XML element structures
+  - Balance, Entry, Transaction detail types
+  
+- `scratch.rs` - Temporary parsing state management
+  - Scratch buffers for building complex structures
+  
+- `camt053_utils.rs` - CAMT-specific utility functions
+  
+- `camt053_const.rs` - XML tag names and constants
+
+**Conversion Modules:**
+- `csv_conversions.rs` - Bidirectional conversions for CsvStatement
+  - `From<Mt940Statement> for CsvStatement`
+  - `From<Camt053Statement> for CsvStatement`
+  
+- `mt940_conversions.rs` - Bidirectional conversions for Mt940Statement
+  - `From<Mt940Statement> for Camt053Statement`
+  - `From<Mt940Statement> for CsvStatement`
+  
+- `camt053_conversions.rs` - Bidirectional conversions for Camt053Statement
+  - `From<Camt053Statement> for Mt940Statement`
+  - `From<Camt053Statement> for CsvStatement`
+
+**Shared Utilities:**
+- `utils.rs` - Common parsing functions used across formats
+  - `parse_date()` - ISO 8601 date parsing to `DateTime<FixedOffset>`
+  - Amount parsing helpers
+  - String normalization utilities
+
+#### `ledger-parser/tests/`
+- `integration_test.rs` - Format conversion integration tests
+  - Tests all bidirectional conversions between formats
+  - Round-trip tests to verify data integrity
+  - Real file parsing and conversion tests
+
+#### `ledger-bridge-cli/src/main.rs`
+- CLI application using `clap` with derive macros
+- `Statement` enum to hold any format type
+- Functions demonstrating Read/Write trait usage:
+  - `parse_input<R: Read>()` - Format detection and parsing
+  - `write_output<W: Write>()` - Format conversion and writing
+  - `convert<R: Read, W: Write>()` - Complete conversion pipeline
+- Proper error handling with exit codes
 
 ### Design Philosophy
-✅ **Separation of concerns**: shared types ↔ format-specific structs ↔ conversions  
+✅ **Separation of concerns**: Shared types (model.rs) ↔ format-specific structs (csv/mt940/camt053) ↔ conversions (separate modules)  
 ✅ **Standard library traits**: Read/Write for I/O, From for conversions  
-✅ **Format-specific types**: Each format has its own struct for type safety  
-✅ **Extensibility**: Add formats by implementing from_read/write_to methods  
-✅ **KISS**: Flat structure, easy navigation, straightforward implementation  
+✅ **Format-specific types**: Each format has its own struct (Mt940Statement, Camt053Statement, CsvStatement) for type safety  
+✅ **Extensibility**: Add formats by implementing from_read/write_to methods and From trait conversions  
+✅ **Modular architecture**: CAMT.053 uses submodule for complex parsing; conversions in separate files  
+✅ **Real-world focus**: Tested with actual bank statement files (Goldman Sachs, Danske Bank, Sberbank)  
+✅ **KISS principle**: Clear structure, easy navigation, straightforward implementation with appropriate complexity where needed  
 
 ---
 
@@ -292,24 +406,24 @@ use std::io::{Read, Write};
 
 /// MT940 SWIFT message structure
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Mt940 {
+pub struct Mt940Statement {
     pub account_number: String,
     pub currency: String,
     pub opening_balance: f64,
-    pub opening_date: String,
+    pub opening_date: DateTime<FixedOffset>,
     pub opening_indicator: BalanceType,
     pub closing_balance: f64,
-    pub closing_date: String,
+    pub closing_date: DateTime<FixedOffset>,
     pub closing_indicator: BalanceType,
     pub transactions: Vec<Transaction>,
 }
 
-impl Mt940 {
+impl Mt940Statement {
     /// Parse MT940 from any source implementing Read
     pub fn from_read<R: Read>(reader: &mut R) -> Result<Self, ParseError> {
         // Read data from reader
         // Parse MT940 format
-        // Return Mt940 struct
+        // Return Mt940Statement struct
     }
     
     /// Write MT940 to any destination implementing Write
@@ -325,23 +439,23 @@ impl Mt940 {
 ```rust
 /// ISO 20022 CAMT.053 XML structure
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Camt053 {
+pub struct Camt053Statement {
     pub account_number: String,
     pub currency: String,
     pub opening_balance: f64,
-    pub opening_date: String,
+    pub opening_date: DateTime<FixedOffset>,
     pub opening_indicator: BalanceType,
     pub closing_balance: f64,
-    pub closing_date: String,
+    pub closing_date: DateTime<FixedOffset>,
     pub closing_indicator: BalanceType,
     pub transactions: Vec<Transaction>,
 }
 
-impl Camt053 {
+impl Camt053Statement {
     /// Parse CAMT.053 from any source implementing Read
     pub fn from_read<R: Read>(reader: &mut R) -> Result<Self, ParseError> {
         // Use quick-xml to read and parse XML
-        // Return Camt053 struct
+        // Return Camt053Statement struct
     }
     
     /// Write CAMT.053 to any destination implementing Write
@@ -361,10 +475,10 @@ pub struct CsvStatement {
     pub account_number: String,
     pub currency: String,
     pub opening_balance: f64,
-    pub opening_date: String,
+    pub opening_date: DateTime<FixedOffset>,
     pub opening_indicator: BalanceType,
     pub closing_balance: f64,
-    pub closing_date: String,
+    pub closing_date: DateTime<FixedOffset>,
     pub closing_indicator: BalanceType,
     pub transactions: Vec<Transaction>,
 }
@@ -390,9 +504,9 @@ impl CsvStatement {
 
 ```rust
 /// Convert MT940 to CAMT.053
-impl From<Mt940> for Camt053 {
-    fn from(mt940: Mt940) -> Self {
-        Camt053 {
+impl From<Mt940Statement> for Camt053Statement {
+    fn from(mt940: Mt940Statement) -> Self {
+        Camt053Statement {
             account_number: mt940.account_number,
             currency: mt940.currency,
             opening_balance: mt940.opening_balance,
@@ -407,9 +521,9 @@ impl From<Mt940> for Camt053 {
 }
 
 /// Convert CAMT.053 to MT940
-impl From<Camt053> for Mt940 {
-    fn from(camt: Camt053) -> Self {
-        Mt940 {
+impl From<Camt053Statement> for Mt940Statement {
+    fn from(camt: Camt053Statement) -> Self {
+        Mt940Statement {
             account_number: camt.account_number,
             currency: camt.currency,
             opening_balance: camt.opening_balance,
@@ -424,10 +538,10 @@ impl From<Camt053> for Mt940 {
 }
 
 /// Similar implementations for CSV conversions
-impl From<Mt940> for CsvStatement { ... }
-impl From<CsvStatement> for Mt940 { ... }
-impl From<Camt053> for CsvStatement { ... }
-impl From<CsvStatement> for Camt053 { ... }
+impl From<Mt940Statement> for CsvStatement { ... }
+impl From<CsvStatement> for Mt940Statement { ... }
+impl From<Camt053Statement> for CsvStatement { ... }
+impl From<CsvStatement> for Camt053Statement { ... }
 ```
 
 ### Conversion Flow
@@ -437,7 +551,7 @@ File/Stdin (Read source)
          ↓
    Format::from_read(&mut reader)
          ↓
-     Mt940 / Camt053 / CsvStatement
+     Mt940Statement / Camt053Statement / CsvStatement
          ↓
    Into::<TargetFormat>::into()  [using From trait]
          ↓
@@ -455,10 +569,10 @@ use std::io::{BufReader, BufWriter};
 
 // Read MT940 from file
 let mut file = File::open("input.mt940")?;
-let mt940 = Mt940::from_read(&mut file)?;
+let mt940 = Mt940Statement::from_read(&mut file)?;
 
 // Convert to CAMT.053 using From trait
-let camt053: Camt053 = mt940.into();
+let camt053: Camt053Statement = mt940.into();
 
 // Write to file
 let mut output = File::create("output.xml")?;
@@ -480,31 +594,32 @@ camt053.write_to(&mut output)?;
 
 ### Core Data Structures
 
-**Format-specific structures** (Mt940, Camt053, CsvStatement) share the same field structure:
+**Format-specific structures** (Mt940Statement, Camt053Statement, CsvStatement) share the same field structure:
 
 ```rust
 use serde::{Deserialize, Serialize};
+use chrono::{DateTime, FixedOffset};
 
-/// MT940 SWIFT message (example - similar structure for Camt053 and CsvStatement)
+/// MT940 SWIFT message (example - similar structure for Camt053Statement and CsvStatement)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Mt940 {
+pub struct Mt940Statement {
     pub account_number: String,
     pub currency: String,              // "USD", "EUR", "DKK", "RUB", etc.
     
     // Opening balance (starting position)
     pub opening_balance: f64,
-    pub opening_date: DateTime<FixedOffset>,          // ISO 8601: "YYYY-MM-DD"
+    pub opening_date: DateTime<FixedOffset>,  // chrono DateTime with timezone
     pub opening_indicator: BalanceType, // Credit or Debit
     
     // Closing balance (ending position)
     pub closing_balance: f64,
-    pub closing_date: DateTime<FixedOffset>,          // ISO 8601: "YYYY-MM-DD"
+    pub closing_date: DateTime<FixedOffset>,  // chrono DateTime with timezone
     pub closing_indicator: BalanceType, // Credit or Debit
     
     pub transactions: Vec<Transaction>,
 }
 
-impl Mt940 {
+impl Mt940Statement {
     /// Parse from any Read source (file, stdin, buffer)
     pub fn from_read<R: std::io::Read>(reader: &mut R) -> Result<Self, ParseError> {
         // Implementation
@@ -516,7 +631,7 @@ impl Mt940 {
     }
 }
 
-// Similar structures for Camt053 and CsvStatement with identical fields
+// Similar structures for Camt053Statement and CsvStatement with identical fields
 // This enables seamless From trait conversions
 
 /// Balance type indicator (credit or debit position)
@@ -529,14 +644,14 @@ pub enum BalanceType {
 /// Individual transaction entry (shared across all formats)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Transaction {
-    pub booking_date: DateTime<FixedOffset>,           // ISO 8601: "YYYY-MM-DD" (when booked)
-    pub value_date: Option<String>,     // ISO 8601: "YYYY-MM-DD" (value date, optional)
-    pub amount: f64,                    // Always positive number
-    pub transaction_type: TransactionType, // Credit or Debit
-    pub description: String,            // Transaction description/narrative
-    pub reference: Option<String>,      // Optional reference/transaction ID
-    pub counterparty_name: Option<String>, // Debtor/Creditor name
-    pub counterparty_account: Option<String>, // Counterparty account/IBAN
+    pub booking_date: DateTime<FixedOffset>,     // chrono DateTime with timezone (when booked)
+    pub value_date: Option<String>,              // String format "YYYY-MM-DD" (value date, optional)
+    pub amount: f64,                             // Always positive number
+    pub transaction_type: TransactionType,       // Credit or Debit
+    pub description: String,                     // Transaction description/narrative
+    pub reference: Option<String>,               // Optional reference/transaction ID
+    pub counterparty_name: Option<String>,       // Debtor/Creditor name
+    pub counterparty_account: Option<String>,    // Counterparty account/IBAN
 }
 
 /// Transaction type (credit/debit indicator)
@@ -557,7 +672,7 @@ pub enum TransactionType {
 - Demonstrates Rust's newtype pattern for domain modeling
 
 **Conversion between formats:**
-Since all three structures (Mt940, Camt053, CsvStatement) have identical fields, implementing `From` trait is straightforward field-by-field copying.
+Since all three structures (Mt940Statement, Camt053Statement, CsvStatement) have identical fields, implementing `From` trait is straightforward field-by-field copying.
 
 ### Field Mapping Across Formats
 
@@ -588,11 +703,11 @@ Since all three structures (Mt940, Camt053, CsvStatement) have identical fields,
 | counterparty_account | Debit/Credit account | `:86:` (not standardized) | `<DbtrAcct><Id>` or `<CdtrAcct><Id>` |
 
 ### Design Decisions
-✅ **Dates as strings** - ISO 8601 format ("YYYY-MM-DD"), converted from YYMMDD (MT940) and XML dates (CAMT.053)  
+✅ **Dates as chrono types** - `DateTime<FixedOffset>` for statement dates and transaction booking dates, converted from YYMMDD (MT940) and XML dates (CAMT.053)  
 ✅ **Unsigned amounts with type indicators** - Amount always positive, separate Credit/Debit enum  
 ✅ **Balance indicators** - Explicit Credit/Debit enum for opening/closing balances  
 ✅ **Statement period** - Opening/closing dates define range  
-✅ **Optional fields** - value_date, reference, counterparty info (not always present)  
+✅ **Optional fields** - value_date (as String), reference, counterparty info (not always present)  
 ✅ **Serde integration** - All data structures derive Serialize/Deserialize for interoperability  
 ✅ **Derive traits** - Debug, Clone, PartialEq for testing + Serialize/Deserialize for data exchange  
 
@@ -621,11 +736,11 @@ Since all three structures (Mt940, Camt053, CsvStatement) have identical fields,
 - Multiple reference fields: `<NtryRef>`, `<EndToEndId>`, `<TxId>`, `<AcctSvcRef>`
 
 ### Simplifications
-- **No timezone handling** - Dates as strings, no time-of-day
+- **Timezone handling** - Uses `chrono::DateTime<FixedOffset>` with UTC timezone (offset +00:00)
 - **No decimal precision types** - f64 sufficient for tutorial (production would use `rust_decimal`)
 - **Single balance per type** - Ignore available balance (OPAV/CLAV), use only booked (OPBD/CLBD)
 - **Flatten batches** - CAMT.053 batched transactions treated as separate entries
-- **Basic XML parsing** - Manual string parsing, no full XML library
+- **XML parsing with quick-xml** - Event-based parsing with custom state management
 - **No currency conversion** - Amounts in original currency
 - **Century assumption** - MT940 dates: 00-49 → 2000-2049, 50-99 → 1950-1999
 
@@ -942,11 +1057,12 @@ ledger-parser/
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{CsvStatement, Transaction};
+    use crate::{CsvStatement, Transaction};
     
     #[test]
     fn test_parse_csv() {
-        let input = "Account,Currency,...\nACC001,USD,...";
+        // Test parsing a minimal CSV (actual implementation requires specific format)
+        let input = "..."; // Real CSV format with headers and data
         let mut reader = input.as_bytes();
         let result = CsvStatement::from_read(&mut reader);
         assert!(result.is_ok());
@@ -954,7 +1070,18 @@ mod tests {
     
     #[test]
     fn test_write_csv() {
-        let statement = CsvStatement { /* ... */ };
+        use crate::formats::utils;
+        let statement = CsvStatement {
+            account_number: "40702810440000030888".into(),
+            currency: "RUB".into(),
+            opening_balance: 1332.54,
+            opening_date: utils::parse_date("2024-01-01").unwrap(),
+            opening_indicator: BalanceType::Credit,
+            closing_balance: 5975.04,
+            closing_date: utils::parse_date("2024-12-31").unwrap(),
+            closing_indicator: BalanceType::Credit,
+            transactions: vec![],
+        };
         let mut output = Vec::new();
         let result = statement.write_to(&mut output);
         assert!(result.is_ok());
@@ -971,11 +1098,12 @@ mod tests {
     
     #[test]
     fn test_parse_from_bytes() {
-        // Read works with any byte source
-        let data: &[u8] = b"Account,Currency\nACC001,USD";
-        let mut reader = data;
+        // Read works with any byte source (real format required)
+        let input = ""; // Minimal valid CSV data
+        let mut reader = input.as_bytes();
         let result = CsvStatement::from_read(&mut reader);
-        assert!(result.is_ok());
+        // Will error on empty input
+        assert!(result.is_err());
     }
 }
 ```
@@ -988,14 +1116,14 @@ use ledger_parser::*;
 
 #[test]
 fn test_csv_to_mt940_conversion() {
-    let csv_input = "...";
+    let csv_input = "..."; // Real CSV data
     let mut reader = csv_input.as_bytes();
     
     // Parse CSV
     let csv_statement = CsvStatement::from_read(&mut reader).unwrap();
     
     // Convert to MT940 using From trait
-    let mt940: Mt940 = csv_statement.into();
+    let mt940: Mt940Statement = csv_statement.into();
     
     // Write MT940
     let mut output = Vec::new();
@@ -1005,14 +1133,14 @@ fn test_csv_to_mt940_conversion() {
 
 #[test]
 fn test_mt940_to_camt053_conversion() {
-    let mt940_input = "...";
+    let mt940_input = "..."; // Real MT940 data
     let mut reader = mt940_input.as_bytes();
     
     // Parse MT940
-    let mt940 = Mt940::from_read(&mut reader).unwrap();
+    let mt940 = Mt940Statement::from_read(&mut reader).unwrap();
     
     // Convert to CAMT.053 using From trait
-    let camt053: Camt053 = mt940.into();
+    let camt053: Camt053Statement = mt940.into();
     
     // Write CAMT.053
     let mut output = Vec::new();
@@ -1023,12 +1151,12 @@ fn test_mt940_to_camt053_conversion() {
 #[test]
 fn test_round_trip_conversion() {
     // Test MT940 -> CAMT.053 -> MT940
-    let original_mt940 = "...";
+    let original_mt940 = "..."; // Real MT940 data
     let mut reader = original_mt940.as_bytes();
     
-    let mt940_original = Mt940::from_read(&mut reader).unwrap();
-    let camt053: Camt053 = mt940_original.clone().into();
-    let mt940_converted: Mt940 = camt053.into();
+    let mt940_original = Mt940Statement::from_read(&mut reader).unwrap();
+    let camt053: Camt053Statement = mt940_original.clone().into();
+    let mt940_converted: Mt940Statement = camt053.into();
     
     // Verify data integrity
     assert_eq!(mt940_original.account_number, mt940_converted.account_number);
@@ -1125,14 +1253,14 @@ fn main() {
     // to handle different return types. See implementation notes below.
     let (mt940_opt, camt053_opt, csv_opt) = match cli.in_format.to_lowercase().as_str() {
         "mt940" => {
-            let mt940 = Mt940::from_read(&mut input).unwrap_or_else(|e| {
+            let mt940 = Mt940Statement::from_read(&mut input).unwrap_or_else(|e| {
                 eprintln!("Parse error: {}", e);
                 std::process::exit(1);
             });
             (Some(mt940), None, None)
         },
         "camt053" => {
-            let camt = Camt053::from_read(&mut input).unwrap_or_else(|e| {
+            let camt = Camt053Statement::from_read(&mut input).unwrap_or_else(|e| {
                 eprintln!("Parse error: {}", e);
                 std::process::exit(1);
             });
@@ -1287,11 +1415,12 @@ This project teaches:
 #### Project Deliverables
 
 1. **`ledger-parser` library** - Reusable parsing/formatting engine
-   - Mt940 struct with `from_read()` and `write_to()` methods
-   - Camt053 struct with `from_read()` and `write_to()` methods
+   - Mt940Statement struct with `from_read()` and `write_to()` methods
+   - Camt053Statement struct with `from_read()` and `write_to()` methods
    - CsvStatement struct with `from_read()` and `write_to()` methods
-   - `From` trait implementations for all conversion pairs
-   - Shared Transaction and BalanceType types
+   - `From` trait implementations for all conversion pairs (in separate conversion modules)
+   - Shared Transaction, BalanceType, and TransactionType types
+   - Common utility functions for date and amount parsing
 
 2. **`ledger-bridge-cli` binary** - Command-line conversion tool
    - Reads from file or stdin (via `Read` trait)
@@ -1301,19 +1430,19 @@ This project teaches:
 
 3. **Documentation** - All public APIs documented
 4. **Tests** - Unit and integration test coverage
-5. **Format support** - CSV, MT940, CAMT.053 (bidirectional)
+5. **Format support** - CSV (Russian Sberbank), MT940 (SWIFT), CAMT.053 (ISO 20022) - bidirectional conversions
 
 #### Next Steps
 
-With this technical vision established, we're ready to:
-1. Set up the Cargo workspace
-2. Define shared types (Transaction, BalanceType, TransactionType)
-3. Implement format-specific structures (Mt940, Camt053, CsvStatement)
-4. Implement `from_read()` and `write_to()` methods
-5. Implement `From` trait conversions
-6. Build the CLI application
-7. Write tests
-8. Document the code
+With this technical vision established, development followed these steps:
+1. ✅ Set up the Cargo workspace
+2. ✅ Define shared types (Transaction, BalanceType, TransactionType)
+3. ✅ Implement format-specific structures (Mt940Statement, Camt053Statement, CsvStatement)
+4. ✅ Implement `from_read()` and `write_to()` methods
+5. ✅ Implement `From` trait conversions in separate modules
+6. ✅ Build the CLI application
+7. ✅ Write tests (unit and integration)
+8. ✅ Document the code
 
 This vision serves as our blueprint for development. All decisions prioritize **learning standard library patterns** and **idiomatic Rust** over production-grade features.
 
