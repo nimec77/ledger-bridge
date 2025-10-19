@@ -4,7 +4,7 @@ use crate::model::Transaction;
 use super::camt053_utils;
 
 #[derive(Default)]
-pub struct BalanceScratch {
+pub(super) struct BalanceScratch {
     pub balance_type: Option<String>,
     pub amount: Option<String>,
     pub indicator: Option<String>,
@@ -12,7 +12,7 @@ pub struct BalanceScratch {
 }
 
 impl BalanceScratch {
-    pub fn clear(&mut self) {
+    pub(super) fn clear(&mut self) {
         self.balance_type = None;
         self.amount = None;
         self.indicator = None;
@@ -21,7 +21,7 @@ impl BalanceScratch {
 }
 
 #[derive(Default)]
-pub struct EntryScratch {
+pub(super) struct EntryScratch {
     pub amount: Option<String>,
     pub indicator: Option<String>,
     pub booking_date: Option<String>,
@@ -34,20 +34,20 @@ pub struct EntryScratch {
 }
 
 impl EntryScratch {
-    pub fn push_description(&mut self, text: &str) {
+    pub(super) fn push_description(&mut self, text: &str) {
         if !self.description.is_empty() {
             self.description.push(' ');
         }
         self.description.push_str(text);
     }
 
-    pub fn set_description_if_empty(&mut self, text: &str) {
+    pub(super) fn set_description_if_empty(&mut self, text: &str) {
         if self.description.is_empty() {
             self.description = text.to_string();
         }
     }
 
-    pub fn finish(self) -> Result<Option<Transaction>, ParseError> {
+    pub(super) fn finish(self) -> Result<Option<Transaction>, ParseError> {
         let amount = match self
             .amount
             .as_deref()

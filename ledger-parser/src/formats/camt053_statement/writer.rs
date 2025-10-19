@@ -9,20 +9,20 @@ use crate::model::{BalanceType, Transaction, TransactionType};
 use super::{Camt053Statement, ParseError};
 
 /// Helper responsible for serialising `Camt053` statements into CAMT.053 XML.
-pub struct CamtWriter<'a, W: Write> {
+pub(super) struct CamtWriter<'a, W: Write> {
     statement: &'a Camt053Statement,
     writer: Writer<&'a mut W>,
 }
 
 impl<'a, W: Write> CamtWriter<'a, W> {
     /// Create a new XML writer around the provided `Write` sink.
-    pub fn new(statement: &'a Camt053Statement, sink: &'a mut W) -> Self {
+    pub(super) fn new(statement: &'a Camt053Statement, sink: &'a mut W) -> Self {
         let writer = Writer::new_with_indent(sink, b' ', 2);
         Self { statement, writer }
     }
 
     /// Render the CAMT.053 document to the sink.
-    pub fn write(mut self) -> Result<(), ParseError> {
+    pub(super) fn write(mut self) -> Result<(), ParseError> {
         self.write_document_start()?;
         self.write_statement()?;
         self.write_document_end()

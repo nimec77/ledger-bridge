@@ -101,8 +101,8 @@
 //! }
 //! ```
 
-pub mod error;
-pub mod model;
+mod error;
+mod model;
 mod formats {
     pub(crate) mod camt053_statement;
     pub(crate) mod csv_statement;

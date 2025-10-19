@@ -11,7 +11,7 @@ use super::scratch::{BalanceScratch, EntryScratch};
 use crate::formats::camt053_statement::camt053_const::*;
 
 #[derive(Default)]
-pub struct CamtParser {
+pub(super) struct CamtParser {
     account_number: Option<String>,
     currency: Option<String>,
     opening_balance: Option<f64>,
@@ -27,7 +27,7 @@ pub struct CamtParser {
 }
 
 impl CamtParser {
-    pub fn handle_start(&mut self, event: &BytesStart) -> Result<(), ParseError> {
+    pub(super) fn handle_start(&mut self, event: &BytesStart) -> Result<(), ParseError> {
         let name = ElementName::from_name_bytes(event.name().as_ref())?;
         self.path.push(name);
 
@@ -41,7 +41,7 @@ impl CamtParser {
         Ok(())
     }
 
-    pub fn handle_end(&mut self, _event: &BytesEnd) -> Result<(), ParseError> {
+    pub(super) fn handle_end(&mut self, _event: &BytesEnd) -> Result<(), ParseError> {
         if let Some(ended) = self.path.pop() {
             match ended {
                 ElementName::Balance => self.finish_balance(),
@@ -52,7 +52,7 @@ impl CamtParser {
         Ok(())
     }
 
-    pub fn handle_text(&mut self, text: &str) -> Result<(), ParseError> {
+    pub(super) fn handle_text(&mut self, text: &str) -> Result<(), ParseError> {
         if self.in_statement_account_id() {
             self.set_account_number(text);
         } else if self.path_ends_with(&[ElementName::Acct, ElementName::Currency]) {
@@ -174,7 +174,7 @@ impl CamtParser {
         Ok(())
     }
 
-    pub fn build_statement(self) -> Result<super::Camt053Statement, ParseError> {
+    pub(super) fn build_statement(self) -> Result<super::Camt053Statement, ParseError> {
         let account_number = self
             .account_number
             .ok_or_else(|| ParseError::MissingField("account_number".into()))?;

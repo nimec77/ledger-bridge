@@ -2,7 +2,7 @@ use crate::error::ParseError;
 use crate::formats::camt053_statement::camt053_const::*;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum ElementName {
+pub(super) enum ElementName {
     Document,
     BkToCstmrStmt,
     Stmt,
@@ -41,7 +41,7 @@ pub enum ElementName {
 }
 
 impl ElementName {
-    pub fn from_name_bytes(raw: &[u8]) -> Result<Self, ParseError> {
+    pub(super) fn from_name_bytes(raw: &[u8]) -> Result<Self, ParseError> {
         let name = std::str::from_utf8(raw).map_err(|err| {
             ParseError::Camt053Error(format!("Invalid XML tag name encoding: {}", err))
         })?;
