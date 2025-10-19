@@ -116,7 +116,9 @@ impl CsvStatement {
     ///
     /// Returns `ParseError::CsvError` if writing fails.
     pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<(), ParseError> {
-        let mut csv_writer = csv::Writer::from_writer(writer);
+        let mut csv_writer = csv::WriterBuilder::new()
+            .flexible(true) // Allow records with varying field counts
+            .from_writer(writer);
 
         // Write header section
         Self::write_header(&mut csv_writer, &self.account_number, &self.currency)?;
