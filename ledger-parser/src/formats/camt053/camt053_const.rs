@@ -37,7 +37,6 @@ pub(crate) const DBTR_ACCT_TAG: &str = "DbtrAcct";
 pub(crate) const CDTR_ACCT_TAG: &str = "CdtrAcct";
 pub(crate) const NM_TAG: &str = "Nm";
 pub(crate) const ADDTL_TX_INF_TAG: &str = "AddtlTxInf";
-pub(crate) const OTHR_TAG: &str = "Othr";
 
 // Balance type constants
 pub(crate) const OPBD_BALANCE_TYPE: &str = "OPBD";

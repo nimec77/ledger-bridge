@@ -49,9 +49,7 @@ impl<'a, W: Write> CamtWriter<'a, W> {
     fn write_document_end(&mut self) -> Result<(), ParseError> {
         self.writer
             .write_event(Event::End(BytesEnd::new(DOCUMENT_TAG)))
-            .map_err(|e| {
-                ParseError::Camt053Error(format!("Failed to close Document tag: {}", e))
-            })
+            .map_err(|e| ParseError::Camt053Error(format!("Failed to close Document tag: {}", e)))
     }
 
     fn write_statement(&mut self) -> Result<(), ParseError> {
@@ -265,7 +263,11 @@ impl<'a, W: Write> CamtWriter<'a, W> {
         Ok(())
     }
 
-    fn write_entry(&mut self, transaction: &Transaction, entry_ref: usize) -> Result<(), ParseError> {
+    fn write_entry(
+        &mut self,
+        transaction: &Transaction,
+        entry_ref: usize,
+    ) -> Result<(), ParseError> {
         self.writer
             .write_event(Event::Start(BytesStart::new(NTRY_TAG)))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to write Ntry tag: {}", e)))?;

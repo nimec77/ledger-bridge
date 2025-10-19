@@ -1,9 +1,9 @@
+mod camt053_const;
 mod camt053_utils;
 mod elements;
 mod parser;
 mod scratch;
 mod writer;
-mod camt053_const;
 
 use parser::CamtParser;
 

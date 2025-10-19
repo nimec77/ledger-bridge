@@ -1,9 +1,9 @@
 use chrono::{DateTime, FixedOffset};
 
 use crate::error::ParseError;
+use crate::formats::camt053::camt053_const::*;
 use crate::formats::utils;
 use crate::model::{BalanceType, TransactionType};
-use crate::formats::camt053::camt053_const::*;
 
 /// Parse amount from string (handles both dot and comma as decimal separator)
 pub(super) fn parse_amount(s: &str) -> Result<f64, ParseError> {
@@ -25,8 +25,8 @@ pub(super) fn parse_xml_date(s: &str) -> Result<DateTime<FixedOffset>, ParseErro
 /// Parse balance indicator (CRDT/DBIT) to BalanceType
 pub(super) fn parse_balance_indicator(s: &str) -> Result<BalanceType, ParseError> {
     match s.trim().to_uppercase().as_str() {
-        CLBD_BALANCE_TYPE => Ok(BalanceType::Credit),
-        OPBD_BALANCE_TYPE => Ok(BalanceType::Debit),
+        CRDT_INDICATOR => Ok(BalanceType::Credit),
+        DBIT_INDICATOR => Ok(BalanceType::Debit),
         _ => Err(ParseError::InvalidFieldValue {
             field: "balance_indicator".into(),
             value: s.to_string(),
@@ -61,8 +61,14 @@ mod tests {
 
     #[test]
     fn test_parse_balance_indicator() {
-        assert_eq!(parse_balance_indicator(CLBD_BALANCE_TYPE).unwrap(), BalanceType::Credit);
-        assert_eq!(parse_balance_indicator(OPBD_BALANCE_TYPE).unwrap(), BalanceType::Debit);
+        assert_eq!(
+            parse_balance_indicator(CRDT_INDICATOR).unwrap(),
+            BalanceType::Credit
+        );
+        assert_eq!(
+            parse_balance_indicator(DBIT_INDICATOR).unwrap(),
+            BalanceType::Debit
+        );
         assert!(parse_balance_indicator("INVALID").is_err());
     }
 

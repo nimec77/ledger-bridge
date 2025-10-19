@@ -10,7 +10,6 @@ use super::elements::ElementName;
 use super::scratch::{BalanceScratch, EntryScratch};
 use crate::formats::camt053::camt053_const::*;
 
-
 #[derive(Default)]
 pub struct CamtParser {
     account_number: Option<String>,
