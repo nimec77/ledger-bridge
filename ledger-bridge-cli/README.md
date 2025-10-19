@@ -4,7 +4,7 @@ Command-line interface for converting financial data between bank statement form
 
 ## Overview
 
-`ledger-bridge` is a CLI tool that converts bank statements between CSV, MT940, and CAMT.053 formats. It demonstrates the power of Rust's standard library I/O traits by working seamlessly with files, stdin, and stdout.
+`ledger-bridge-cli` is a CLI tool that converts bank statements between CSV, MT940, and CAMT.053 formats. It demonstrates the power of Rust's standard library I/O traits by working seamlessly with files, stdin, and stdout.
 
 ## Installation
 
@@ -19,7 +19,7 @@ cargo install --path .
 
 ```bash
 cargo build --release
-# Binary will be at: target/release/ledger-bridge
+# Binary will be at: target/release/ledger-bridge-cli
 ```
 
 ## Usage
@@ -27,7 +27,7 @@ cargo build --release
 ### Basic Syntax
 
 ```bash
-ledger-bridge --in-format <FORMAT> --out-format <FORMAT> [OPTIONS]
+ledger-bridge-cli --in-format <FORMAT> --out-format <FORMAT> [OPTIONS]
 ```
 
 ### Options
@@ -45,15 +45,15 @@ ledger-bridge --in-format <FORMAT> --out-format <FORMAT> [OPTIONS]
 
 ```bash
 # Convert CSV to MT940
-ledger-bridge --in-format csv --out-format mt940 \
+ledger-bridge-cli --in-format csv --out-format mt940 \
   --input statement.csv --output statement.mt940
 
 # Convert MT940 to CAMT.053 XML
-ledger-bridge --in-format mt940 --out-format camt053 \
+ledger-bridge-cli --in-format mt940 --out-format camt053 \
   --input data.mt940 --output data.xml
 
 # Convert CAMT.053 to CSV
-ledger-bridge --in-format camt053 --out-format csv \
+ledger-bridge-cli --in-format camt053 --out-format csv \
   --input statement.xml --output statement.csv
 ```
 
@@ -61,15 +61,15 @@ ledger-bridge --in-format camt053 --out-format csv \
 
 ```bash
 # Read from stdin, write to file
-cat input.csv | ledger-bridge --in-format csv --out-format mt940 \
+cat input.csv | ledger-bridge-cli --in-format csv --out-format mt940 \
   --output statement.mt940
 
 # Read from file, write to stdout
-ledger-bridge --in-format mt940 --out-format camt053 \
+ledger-bridge-cli --in-format mt940 --out-format camt053 \
   --input data.mt940 > output.xml
 
 # Full pipeline (stdin to stdout)
-cat input.csv | ledger-bridge --in-format csv --out-format mt940 | \
+cat input.csv | ledger-bridge-cli --in-format csv --out-format mt940 | \
   ledger-bridge --in-format mt940 --out-format camt053 > output.xml
 ```
 
@@ -79,9 +79,9 @@ All format names are case-insensitive:
 
 ```bash
 # These are all equivalent
-ledger-bridge --in-format csv --out-format mt940 -i data.csv
-ledger-bridge --in-format CSV --out-format MT940 -i data.csv
-ledger-bridge --in-format Csv --out-format Mt940 -i data.csv
+ledger-bridge-cli --in-format csv --out-format mt940 -i data.csv
+ledger-bridge-cli --in-format CSV --out-format MT940 -i data.csv
+ledger-bridge-cli --in-format Csv --out-format Mt940 -i data.csv
 ```
 
 ## Supported Formats
@@ -134,7 +134,7 @@ All errors are printed to stderr:
 
 ```bash
 # Example error output
-$ ledger-bridge --in-format invalid --out-format csv -i data.txt
+$ ledger-bridge-cli --in-format invalid --out-format csv -i data.txt
 Error: Invalid format: Unknown input format: invalid. Supported: csv, mt940, camt053
 $ echo $?
 1
@@ -296,4 +296,3 @@ This CLI uses the `ledger-parser` library. For programmatic use in your own Rust
 ## License
 
 MIT License - See LICENSE file for details.
-

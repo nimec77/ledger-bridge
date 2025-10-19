@@ -308,4 +308,3 @@ MIT License - See LICENSE file for details.
 - [CLI Application](../ledger-bridge-cli/) - Command-line interface
 - [Project README](../README.md) - Main project documentation
 - [Vision Document](../vision.md) - Technical specifications
-

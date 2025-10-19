@@ -68,16 +68,16 @@ camt053.write_to(&mut output)?;
 
 ```bash
 # Convert CSV to MT940
-ledger-bridge --in-format csv --out-format mt940 --input statement.csv --output statement.mt940
+ledger-bridge-cli --in-format csv --out-format mt940 --input statement.csv --output statement.mt940
 
 # Convert MT940 to CAMT.053 XML
-ledger-bridge --in-format mt940 --out-format camt053 --input data.mt940 --output data.xml
+ledger-bridge-cli --in-format mt940 --out-format camt053 --input data.mt940 --output data.xml
 
 # Use stdin/stdout
-cat input.csv | ledger-bridge --in-format csv --out-format mt940 > output.mt940
+cat input.csv | ledger-bridge-cli --in-format csv --out-format mt940 > output.mt940
 
 # Display help
-ledger-bridge --help
+ledger-bridge-cli --help
 ```
 
 ## 📦 Project Structure
@@ -224,4 +224,3 @@ See `example_files/sources.md` for detailed attribution.
 - [Rust I/O Traits Documentation](https://doc.rust-lang.org/std/io/)
 - [Project Vision Document](vision.md)
 - [Development Tasklist](doc/tasklist.md)
-
