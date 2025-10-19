@@ -9,6 +9,11 @@ mod formats {
     pub(crate) mod csv;
     pub(crate) mod mt940;
     pub(crate) mod utils;
+
+    // Format conversion modules
+    mod camt053_conversions;
+    mod csv_conversions;
+    mod mt940_conversions;
 }
 
 // Re-export shared types for convenience

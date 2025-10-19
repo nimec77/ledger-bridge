@@ -13,28 +13,28 @@
 | **Iteration 2** | ✅ Complete | 4/4 | CSV | Parse & write CSV |
 | **Iteration 3** | ✅ Complete | 4/4 | MT940 | Parse & write MT940 |
 | **Iteration 4** | ✅ Complete | 4/4 | CAMT.053 | Parse & write XML |
-| **Iteration 5** | ⏳ Pending | 0/3 | Conversions | From trait works |
+| **Iteration 5** | ✅ Complete | 3/3 | Conversions | From trait works |
 | **Iteration 6** | ⏳ Pending | 0/3 | CLI | End-to-end conversions |
 | **Iteration 7** | ⏳ Pending | 0/2 | Polish | Production ready |
 
 **Legend:** ⏳ Pending | 🔄 In Progress | ✅ Complete | ❌ Blocked
 
-**Overall Progress:** 17/25 tasks complete (68%)
+**Overall Progress:** 20/25 tasks complete (80%)
 
 ## 🔍 Current Status Analysis
 
 **✅ Completed Iterations:**
-- **Iteration 0-4**: Full workspace setup, foundation types, CSV parsing, MT940 parsing, and CAMT.053 format are complete
-- **47 tests passing** - All implemented functionality is well-tested
+- **Iteration 0-5**: Full workspace setup, foundation types, CSV parsing, MT940 parsing, CAMT.053 format, and format conversions are complete
+- **64 tests passing** - All implemented functionality is well-tested (47 unit + 17 integration tests)
 - **Real file parsing**: CSV (Sberbank), MT940 (Goldman Sachs, ASN Bank), and CAMT.053 examples work
 - **Round-trip tested**: Parse → Write → Parse works for all formats
+- **Format conversions**: All `From` trait implementations working with comprehensive integration tests
 
 **❌ Missing Critical Components:**
-1. **Format conversions** - No `From` trait implementations between formats
-2. **CLI application** - Currently just a placeholder
-3. **Integration tests** - No conversion tests exist
+1. **CLI application** - Currently just a placeholder
+2. **End-to-end testing** - No CLI conversion tests exist
 
-**🎯 Next Priority:** Iteration 5 (Format Conversions) - Implement `From` trait between all format pairs to enable seamless conversions.
+**🎯 Next Priority:** Iteration 6 (CLI Application) - Build working command-line interface for end-to-end format conversions.
 
 ---
 
@@ -197,9 +197,9 @@ fn test_camt053_parse() {
 **Testable:** Type conversions work, data preserved
 
 ### Tasks
-- [ ] **5.1** Implement `From<Mt940> for Camt053` and `From<Camt053> for Mt940`
-- [ ] **5.2** Implement `From<CsvStatement> for Mt940` and `From<Mt940> for CsvStatement`
-- [ ] **5.3** Implement `From<CsvStatement> for Camt053` and `From<Camt053> for CsvStatement`
+- [x] **5.1** Implement `From<Mt940> for Camt053` and `From<Camt053> for Mt940`
+- [x] **5.2** Implement `From<CsvStatement> for Mt940` and `From<Mt940> for CsvStatement`
+- [x] **5.3** Implement `From<CsvStatement> for Camt053` and `From<Camt053> for CsvStatement`
 
 **Test Command:**
 ```bash
