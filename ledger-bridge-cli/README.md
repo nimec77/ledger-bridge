@@ -145,7 +145,7 @@ $ echo $?
 ### Convert Sberbank CSV to MT940
 
 ```bash
-ledger-bridge --in-format csv --out-format mt940 \
+ledger-bridge-cli --in-format csv --out-format mt940 \
   --input sberbank_statement.csv \
   --output statement.mt940
 ```
@@ -153,7 +153,7 @@ ledger-bridge --in-format csv --out-format mt940 \
 ### Convert Goldman Sachs MT940 to CAMT.053
 
 ```bash
-ledger-bridge --in-format mt940 --out-format camt053 \
+ledger-bridge-cli --in-format mt940 --out-format camt053 \
   --input goldman_sachs.mt940 \
   --output statement.xml
 ```
@@ -161,7 +161,7 @@ ledger-bridge --in-format mt940 --out-format camt053 \
 ### Extract Danske Bank CAMT.053 to CSV
 
 ```bash
-ledger-bridge --in-format camt053 --out-format csv \
+ledger-bridge-cli --in-format camt053 --out-format csv \
   --input danske_bank.xml \
   --output statement.csv
 ```
@@ -173,8 +173,8 @@ ledger-bridge --in-format camt053 --out-format csv \
 ```bash
 # Multi-step conversion pipeline
 cat sberbank.csv | \
-  ledger-bridge --in-format csv --out-format mt940 | \
-  ledger-bridge --in-format mt940 --out-format camt053 \
+  ledger-bridge-cli --in-format csv --out-format mt940 | \
+  ledger-bridge-cli --in-format mt940 --out-format camt053 \
   > final.xml
 ```
 
@@ -183,7 +183,7 @@ cat sberbank.csv | \
 ```bash
 # Convert all CSV files to MT940
 for file in *.csv; do
-  ledger-bridge --in-format csv --out-format mt940 \
+  ledger-bridge-cli --in-format csv --out-format mt940 \
     --input "$file" \
     --output "${file%.csv}.mt940"
 done
@@ -193,8 +193,8 @@ done
 
 ```bash
 # Round-trip test to verify data integrity
-ledger-bridge --in-format csv --out-format mt940 -i original.csv -o temp.mt940
-ledger-bridge --in-format mt940 --out-format csv -i temp.mt940 -o roundtrip.csv
+ledger-bridge-cli --in-format csv --out-format mt940 -i original.csv -o temp.mt940
+ledger-bridge-cli --in-format mt940 --out-format csv -i temp.mt940 -o roundtrip.csv
 diff original.csv roundtrip.csv
 ```
 
@@ -213,7 +213,7 @@ my-tool --format json | jq '.' | my-converter
 
 ```bash
 # Validate MT940 syntax
-ledger-bridge --in-format mt940 --out-format mt940 \
+ledger-bridge-cli --in-format mt940 --out-format mt940 \
   --input suspicious.mt940 --output /dev/null
 ```
 
@@ -221,7 +221,7 @@ ledger-bridge --in-format mt940 --out-format mt940 \
 
 ```bash
 # Convert to a more readable format for inspection
-ledger-bridge --in-format mt940 --out-format csv \
+ledger-bridge-cli --in-format mt940 --out-format csv \
   --input complex.mt940 | less -S
 ```
 
@@ -242,7 +242,7 @@ If you encounter parse errors:
 ls -la statement.csv
 
 # Use absolute paths if needed
-ledger-bridge --in-format csv --out-format mt940 \
+ledger-bridge-cli --in-format csv --out-format mt940 \
   --input /full/path/to/statement.csv \
   --output /full/path/to/output.mt940
 ```
