@@ -3,6 +3,7 @@ mod elements;
 mod parser;
 mod scratch;
 mod writer;
+mod camt053_const;
 
 use parser::CamtParser;
 

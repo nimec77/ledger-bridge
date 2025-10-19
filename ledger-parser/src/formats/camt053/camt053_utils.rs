@@ -3,9 +3,9 @@ use chrono::{DateTime, FixedOffset};
 use crate::error::ParseError;
 use crate::formats::utils;
 use crate::model::{BalanceType, TransactionType};
+use crate::formats::camt053::camt053_const::*;
 
-const CRDT: &str = "crdt";
-const DBIT: &str = "dbit";
+
 
 /// Parse amount from string (handles both dot and comma as decimal separator)
 pub(super) fn parse_amount(s: &str) -> Result<f64, ParseError> {
@@ -26,9 +26,9 @@ pub(super) fn parse_xml_date(s: &str) -> Result<DateTime<FixedOffset>, ParseErro
 
 /// Parse balance indicator (CRDT/DBIT) to BalanceType
 pub(super) fn parse_balance_indicator(s: &str) -> Result<BalanceType, ParseError> {
-    match s.trim().to_lowercase().as_str() {
-        CRDT => Ok(BalanceType::Credit),
-        DBIT => Ok(BalanceType::Debit),
+    match s.trim().to_uppercase().as_str() {
+        CLBD_BALANCE_TYPE => Ok(BalanceType::Credit),
+        OPBD_BALANCE_TYPE => Ok(BalanceType::Debit),
         _ => Err(ParseError::InvalidFieldValue {
             field: "balance_indicator".into(),
             value: s.to_string(),
@@ -38,9 +38,9 @@ pub(super) fn parse_balance_indicator(s: &str) -> Result<BalanceType, ParseError
 
 /// Parse transaction type (CRDT/DBIT) to TransactionType
 pub(super) fn parse_transaction_type(s: &str) -> Result<TransactionType, ParseError> {
-    match s.trim().to_lowercase().as_str() {
-        CRDT => Ok(TransactionType::Credit),
-        DBIT => Ok(TransactionType::Debit),
+    match s.trim().to_uppercase().as_str() {
+        CRDT_INDICATOR => Ok(TransactionType::Credit),
+        DBIT_INDICATOR => Ok(TransactionType::Debit),
         _ => Err(ParseError::InvalidFieldValue {
             field: "transaction_type".into(),
             value: s.to_string(),
@@ -63,19 +63,19 @@ mod tests {
 
     #[test]
     fn test_parse_balance_indicator() {
-        assert_eq!(parse_balance_indicator(CRDT).unwrap(), BalanceType::Credit);
-        assert_eq!(parse_balance_indicator(DBIT).unwrap(), BalanceType::Debit);
+        assert_eq!(parse_balance_indicator(CLBD_BALANCE_TYPE).unwrap(), BalanceType::Credit);
+        assert_eq!(parse_balance_indicator(OPBD_BALANCE_TYPE).unwrap(), BalanceType::Debit);
         assert!(parse_balance_indicator("INVALID").is_err());
     }
 
     #[test]
     fn test_parse_transaction_type() {
         assert_eq!(
-            parse_transaction_type(CRDT).unwrap(),
+            parse_transaction_type(CRDT_INDICATOR).unwrap(),
             TransactionType::Credit
         );
         assert_eq!(
-            parse_transaction_type(DBIT).unwrap(),
+            parse_transaction_type(DBIT_INDICATOR).unwrap(),
             TransactionType::Debit
         );
         assert!(parse_transaction_type("INVALID").is_err());

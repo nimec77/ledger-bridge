@@ -8,6 +8,8 @@ use crate::model::{BalanceType, Transaction};
 use super::camt053_utils;
 use super::elements::ElementName;
 use super::scratch::{BalanceScratch, EntryScratch};
+use crate::formats::camt053::camt053_const::*;
+
 
 #[derive(Default)]
 pub struct CamtParser {
@@ -204,9 +206,9 @@ impl CamtParser {
 
     fn finish_balance(&mut self) {
         if let Some(balance_type) = self.balance_scratch.balance_type.as_deref() {
-            match balance_type.to_lowercase().as_str() {
-                "opbd" => self.apply_balance(BalanceKind::Opening),
-                "clbd" => self.apply_balance(BalanceKind::Closing),
+            match balance_type.to_uppercase().as_str() {
+                OPBD_BALANCE_TYPE => self.apply_balance(BalanceKind::Opening),
+                CLBD_BALANCE_TYPE => self.apply_balance(BalanceKind::Closing),
                 _ => {}
             }
         }
@@ -264,7 +266,7 @@ impl CamtParser {
                 ParseError::Camt053Error(format!("Invalid attribute key encoding: {}", err))
             })?;
 
-            if key_str.to_lowercase() == "ccy" {
+            if key_str.to_uppercase().as_str() == CCY_TAG {
                 let value = String::from_utf8(attr.value.as_ref().to_vec()).map_err(|err| {
                     ParseError::Camt053Error(format!("Invalid currency encoding: {}", err))
                 })?;
