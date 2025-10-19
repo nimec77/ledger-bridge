@@ -8,7 +8,7 @@ use crate::model::{BalanceType, Transaction};
 use super::camt053_utils;
 use super::elements::ElementName;
 use super::scratch::{BalanceScratch, EntryScratch};
-use crate::formats::camt053::camt053_const::*;
+use crate::formats::camt053_statement::camt053_const::*;
 
 #[derive(Default)]
 pub struct CamtParser {
@@ -174,7 +174,7 @@ impl CamtParser {
         Ok(())
     }
 
-    pub fn build_statement(self) -> Result<super::Camt053, ParseError> {
+    pub fn build_statement(self) -> Result<super::Camt053Statement, ParseError> {
         let account_number = self
             .account_number
             .ok_or_else(|| ParseError::MissingField("account_number".into()))?;
@@ -182,7 +182,7 @@ impl CamtParser {
             .currency
             .ok_or_else(|| ParseError::MissingField("currency".into()))?;
 
-        Ok(super::Camt053 {
+        Ok(super::Camt053Statement {
             account_number,
             currency,
             opening_balance: self.opening_balance.unwrap_or(0.0),
@@ -393,7 +393,7 @@ mod tests {
         "#;
 
         let mut reader = xml.as_bytes();
-        let result = super::super::Camt053::from_read(&mut reader);
+        let result = super::super::Camt053Statement::from_read(&mut reader);
 
         assert!(result.is_ok());
         let statement = result.unwrap();
@@ -451,7 +451,7 @@ mod tests {
         "#;
 
         let mut reader = xml.as_bytes();
-        let result = super::super::Camt053::from_read(&mut reader);
+        let result = super::super::Camt053Statement::from_read(&mut reader);
 
         assert!(result.is_ok());
         let statement = result.unwrap();
@@ -473,7 +473,7 @@ mod tests {
     fn test_parse_empty_camt053() {
         let xml = "";
         let mut reader = xml.as_bytes();
-        let result = super::super::Camt053::from_read(&mut reader);
+        let result = super::super::Camt053Statement::from_read(&mut reader);
         assert!(result.is_err());
     }
 
@@ -518,7 +518,7 @@ mod tests {
         "#;
 
         let mut reader = xml.as_bytes();
-        let result = super::super::Camt053::from_read(&mut reader);
+        let result = super::super::Camt053Statement::from_read(&mut reader);
 
         assert!(result.is_ok());
         let statement = result.unwrap();

@@ -1,5 +1,5 @@
 use crate::error::ParseError;
-use crate::formats::camt053::camt053_const::*;
+use crate::formats::camt053_statement::camt053_const::*;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ElementName {

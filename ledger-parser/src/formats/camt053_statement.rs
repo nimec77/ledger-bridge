@@ -19,7 +19,7 @@ use crate::model::{BalanceType, Transaction};
 /// Parses from and writes to CAMT.053 XML format using the `quick-xml` crate.
 /// Fields are identical to Mt940/CsvStatement for seamless conversions.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Camt053 {
+pub struct Camt053Statement {
     pub account_number: String,
     pub currency: String,
     pub opening_balance: f64,
@@ -31,7 +31,7 @@ pub struct Camt053 {
     pub transactions: Vec<Transaction>,
 }
 
-impl Camt053 {
+impl Camt053Statement {
     /// Parse CAMT.053 from any source implementing Read
     ///
     /// Uses `quick-xml` event-based parsing to extract account information,
@@ -42,10 +42,10 @@ impl Camt053 {
     ///
     /// # Example
     /// ```no_run
-    /// use ledger_parser::Camt053;
+    /// use ledger_parser::Camt053Statement;
     /// let xml = r#"<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.02">...</Document>"#;
     /// let mut reader = xml.as_bytes();
-    /// let result = Camt053::from_read(&mut reader);
+    /// let result = Camt053Statement::from_read(&mut reader);
     /// ```
     pub fn from_read<R: Read>(reader: &mut R) -> Result<Self, ParseError> {
         let mut content = String::new();
@@ -101,11 +101,11 @@ impl Camt053 {
     ///
     /// # Example
     /// ```no_run
-    /// use ledger_parser::Camt053;
+    /// use ledger_parser::Camt053Statement;
     /// use ledger_parser::{BalanceType, Transaction, TransactionType};
     /// use chrono::{DateTime, FixedOffset};
     ///
-    /// let statement = Camt053 {
+    /// let statement = Camt053Statement {
     ///     account_number: "DK1234567890".into(),
     ///     currency: "DKK".into(),
     ///     opening_balance: 1000.0,
@@ -133,7 +133,7 @@ mod tests {
     #[test]
     fn test_camt053_structure() {
         // Test that the structure can be created
-        let statement = Camt053 {
+        let statement = Camt053Statement {
             account_number: "DK1234567890".into(),
             currency: "DKK".into(),
             opening_balance: 1000.0,
@@ -154,7 +154,7 @@ mod tests {
     #[test]
     fn test_write_minimal_camt053() {
         // Test writing a statement with no transactions
-        let statement = Camt053 {
+        let statement = Camt053Statement {
             account_number: "DK8030000001234567".into(),
             currency: "DKK".into(),
             opening_balance: 1000.00,
@@ -189,7 +189,7 @@ mod tests {
     #[test]
     fn test_write_camt053_with_transactions() {
         // Test writing a statement with transactions
-        let statement = Camt053 {
+        let statement = Camt053Statement {
             account_number: "DK8030000001234567".into(),
             currency: "DKK".into(),
             opening_balance: 1000.00,
@@ -247,7 +247,7 @@ mod tests {
     #[test]
     fn test_round_trip_camt053() {
         // Test that parsing and writing preserves data
-        let original = Camt053 {
+        let original = Camt053Statement {
             account_number: "DK8030000001234567".into(),
             currency: "DKK".into(),
             opening_balance: 12345.67,
@@ -274,7 +274,7 @@ mod tests {
 
         // Parse back
         let mut reader = buffer.as_slice();
-        let parsed = Camt053::from_read(&mut reader).unwrap();
+        let parsed = Camt053Statement::from_read(&mut reader).unwrap();
 
         // Verify all fields match
         assert_eq!(parsed.account_number, original.account_number);
@@ -310,7 +310,7 @@ mod tests {
     #[test]
     fn test_write_to_buffer() {
         // Test writing to an in-memory buffer
-        let statement = Camt053 {
+        let statement = Camt053Statement {
             account_number: "TEST123".into(),
             currency: "EUR".into(),
             opening_balance: 500.0,
@@ -336,7 +336,7 @@ mod tests {
     #[test]
     fn test_write_camt053_with_debit_balance() {
         // Test writing a statement with debit balances
-        let statement = Camt053 {
+        let statement = Camt053Statement {
             account_number: "DEBIT123".into(),
             currency: "USD".into(),
             opening_balance: 100.0,
@@ -361,7 +361,7 @@ mod tests {
     #[test]
     fn test_write_camt053_transaction_without_optional_fields() {
         // Test writing transactions with minimal information
-        let statement = Camt053 {
+        let statement = Camt053Statement {
             account_number: "MINIMAL123".into(),
             currency: "GBP".into(),
             opening_balance: 1000.0,

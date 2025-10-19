@@ -3,20 +3,20 @@ use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::Writer;
 use std::io::Write;
 
-use crate::formats::camt053::camt053_const::*;
+use crate::formats::camt053_statement::camt053_const::*;
 use crate::model::{BalanceType, Transaction, TransactionType};
 
-use super::{Camt053, ParseError};
+use super::{Camt053Statement, ParseError};
 
 /// Helper responsible for serialising `Camt053` statements into CAMT.053 XML.
 pub struct CamtWriter<'a, W: Write> {
-    statement: &'a Camt053,
+    statement: &'a Camt053Statement,
     writer: Writer<&'a mut W>,
 }
 
 impl<'a, W: Write> CamtWriter<'a, W> {
     /// Create a new XML writer around the provided `Write` sink.
-    pub fn new(statement: &'a Camt053, sink: &'a mut W) -> Self {
+    pub fn new(statement: &'a Camt053Statement, sink: &'a mut W) -> Self {
         let writer = Writer::new_with_indent(sink, b' ', 2);
         Self { statement, writer }
     }
