@@ -3,7 +3,7 @@
 //! Command-line interface for converting financial data between formats.
 
 use clap::Parser;
-use ledger_parser::{Camt053Statement, CsvStatement, Mt940, ParseError};
+use ledger_parser::{Camt053Statement, CsvStatement, Mt940Statement, ParseError};
 use std::fs::File;
 use std::io::{self, Read, Write};
 
@@ -33,7 +33,7 @@ struct Cli {
 /// Enum to hold any of the three format types
 enum Statement {
     Csv(CsvStatement),
-    Mt940(Mt940),
+    Mt940(Mt940Statement),
     Camt053(Camt053Statement),
 }
 
@@ -97,7 +97,7 @@ fn convert<R: Read, W: Write>(
 fn parse_input<R: Read>(reader: &mut R, format: &str) -> Result<Statement, ParseError> {
     match format.to_lowercase().as_str() {
         "csv" => Ok(Statement::Csv(CsvStatement::from_read(reader)?)),
-        "mt940" => Ok(Statement::Mt940(Mt940::from_read(reader)?)),
+        "mt940" => Ok(Statement::Mt940(Mt940Statement::from_read(reader)?)),
         "camt053" => Ok(Statement::Camt053(Camt053Statement::from_read(reader)?)),
         _ => Err(ParseError::InvalidFormat(format!(
             "Unknown input format: {}. Supported: csv, mt940, camt053",

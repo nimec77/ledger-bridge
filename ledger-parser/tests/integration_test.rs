@@ -7,8 +7,8 @@ use chrono::DateTime;
 use ledger_parser::*;
 
 /// Helper function to create a test MT940 statement
-fn create_test_mt940() -> Mt940 {
-    Mt940 {
+fn create_test_mt940() -> Mt940Statement {
+    Mt940Statement {
         account_number: "DE89370400440532013000".to_string(),
         currency: "EUR".to_string(),
         opening_balance: 1000.50,
@@ -121,7 +121,7 @@ fn test_mt940_to_camt053_preserves_transactions() {
 #[test]
 fn test_camt053_to_mt940_conversion() {
     let camt053 = create_test_camt053();
-    let mt940: Mt940 = camt053.clone().into();
+    let mt940: Mt940Statement = camt053.clone().into();
 
     assert_eq!(mt940.account_number, camt053.account_number);
     assert_eq!(mt940.currency, camt053.currency);
@@ -161,7 +161,7 @@ fn test_mt940_to_csv_conversion() {
 #[test]
 fn test_csv_to_mt940_conversion() {
     let csv = create_test_csv();
-    let mt940: Mt940 = csv.clone().into();
+    let mt940: Mt940Statement = csv.clone().into();
 
     assert_eq!(mt940.account_number, csv.account_number);
     assert_eq!(mt940.currency, csv.currency);
@@ -222,7 +222,7 @@ fn test_csv_to_camt053_conversion() {
 fn test_round_trip_mt940_camt053_mt940() {
     let original = create_test_mt940();
     let camt053: Camt053Statement = original.clone().into();
-    let back: Mt940 = camt053.into();
+    let back: Mt940Statement = camt053.into();
 
     assert_eq!(back.account_number, original.account_number);
     assert_eq!(back.currency, original.currency);
@@ -238,7 +238,7 @@ fn test_round_trip_mt940_camt053_mt940() {
 #[test]
 fn test_round_trip_camt053_mt940_camt053() {
     let original = create_test_camt053();
-    let mt940: Mt940 = original.clone().into();
+    let mt940: Mt940Statement = original.clone().into();
     let back: Camt053Statement = mt940.into();
 
     assert_eq!(back.account_number, original.account_number);
@@ -255,7 +255,7 @@ fn test_round_trip_camt053_mt940_camt053() {
 #[test]
 fn test_round_trip_csv_mt940_csv() {
     let original = create_test_csv();
-    let mt940: Mt940 = original.clone().into();
+    let mt940: Mt940Statement = original.clone().into();
     let back: CsvStatement = mt940.into();
 
     assert_eq!(back.account_number, original.account_number);
@@ -290,7 +290,7 @@ fn test_round_trip_csv_camt053_csv() {
 fn test_round_trip_mt940_csv_mt940() {
     let original = create_test_mt940();
     let csv: CsvStatement = original.clone().into();
-    let back: Mt940 = csv.into();
+    let back: Mt940Statement = csv.into();
 
     assert_eq!(back.account_number, original.account_number);
     assert_eq!(back.currency, original.currency);
@@ -341,7 +341,7 @@ fn test_chain_conversion_mt940_to_camt053_to_csv() {
 #[test]
 fn test_chain_conversion_csv_to_mt940_to_camt053() {
     let csv = create_test_csv();
-    let mt940: Mt940 = csv.clone().into();
+    let mt940: Mt940Statement = csv.clone().into();
     let camt053: Camt053Statement = mt940.into();
 
     // Verify data preserved through chain
@@ -356,7 +356,7 @@ fn test_chain_conversion_csv_to_mt940_to_camt053() {
 fn test_chain_conversion_camt053_to_csv_to_mt940() {
     let camt053 = create_test_camt053();
     let csv: CsvStatement = camt053.clone().into();
-    let mt940: Mt940 = csv.into();
+    let mt940: Mt940Statement = csv.into();
 
     // Verify data preserved through chain
     assert_eq!(mt940.account_number, camt053.account_number);
@@ -372,7 +372,7 @@ fn test_chain_conversion_camt053_to_csv_to_mt940() {
 
 #[test]
 fn test_conversion_with_empty_transactions() {
-    let mt940 = Mt940 {
+    let mt940 = Mt940Statement {
         account_number: "TEST123".to_string(),
         currency: "USD".to_string(),
         opening_balance: 1000.0,

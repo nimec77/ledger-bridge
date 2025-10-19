@@ -3,7 +3,7 @@
 //! Implements the `From` trait to enable idiomatic conversions between CSV
 //! and other format structures (MT940, CAMT.053).
 
-use crate::{Camt053Statement, CsvStatement, Mt940};
+use crate::{Camt053Statement, CsvStatement, Mt940Statement};
 
 /// Convert CSV to MT940 format
 ///
@@ -16,9 +16,9 @@ use crate::{Camt053Statement, CsvStatement, Mt940};
 /// let csv = CsvStatement { /* ... */ };
 /// let mt940: Mt940 = csv.into();
 /// ```
-impl From<CsvStatement> for Mt940 {
+impl From<CsvStatement> for Mt940Statement {
     fn from(csv: CsvStatement) -> Self {
-        Mt940 {
+        Mt940Statement {
             account_number: csv.account_number,
             currency: csv.currency,
             opening_balance: csv.opening_balance,

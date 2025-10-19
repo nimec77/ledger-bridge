@@ -15,7 +15,7 @@ use std::io::{Read, Write};
 /// - Multi-line `:86:` fields
 /// - Both comma and dot as decimal separators
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Mt940 {
+pub struct Mt940Statement {
     pub account_number: String,
     pub currency: String,
     pub opening_balance: f64,
@@ -27,7 +27,7 @@ pub struct Mt940 {
     pub transactions: Vec<Transaction>,
 }
 
-impl Mt940 {
+impl Mt940Statement {
     /// Parse MT940 from any Read source (file, stdin, buffer).
     ///
     /// Handles both full SWIFT format with blocks and simplified tag-only format.
@@ -42,11 +42,11 @@ impl Mt940 {
     /// # Example
     ///
     /// ```no_run
-    /// use ledger_parser::Mt940;
+    /// use ledger_parser::Mt940Statement;
     /// use std::fs::File;
     ///
     /// let mut file = File::open("statement.mt940").unwrap();
-    /// let statement = Mt940::from_read(&mut file).unwrap();
+    /// let statement = Mt940Statement::from_read(&mut file).unwrap();
     /// ```
     pub fn from_read<R: Read>(reader: &mut R) -> Result<Self, ParseError> {
         // Read entire content
@@ -71,7 +71,7 @@ impl Mt940 {
             Self::extract_closing_balance(&tags, &currency)?;
         let transactions = Self::extract_transactions(&tags, &currency)?;
 
-        Ok(Mt940 {
+        Ok(Mt940Statement {
             account_number,
             currency,
             opening_balance,
@@ -505,13 +505,13 @@ mod tests {
     #[test]
     fn test_parse_yymmdd_date() {
         // Test 21st century
-        let result = Mt940::parse_yymmdd_date("250218");
+        let result = Mt940Statement::parse_yymmdd_date("250218");
         assert!(result.is_ok());
         let date = result.unwrap();
         assert_eq!(date.format("%Y-%m-%d").to_string(), "2025-02-18");
 
         // Test 20th century
-        let result = Mt940::parse_yymmdd_date("950315");
+        let result = Mt940Statement::parse_yymmdd_date("950315");
         assert!(result.is_ok());
         let date = result.unwrap();
         assert_eq!(date.format("%Y-%m-%d").to_string(), "1995-03-15");
@@ -519,40 +519,40 @@ mod tests {
 
     #[test]
     fn test_parse_yymmdd_date_century_inference() {
-        let result = Mt940::parse_yymmdd_date("230101").expect("Expected successful parse");
+        let result = Mt940Statement::parse_yymmdd_date("230101").expect("Expected successful parse");
         assert_eq!(result.format("%Y-%m-%d").to_string(), "2023-01-01");
     }
 
     #[test]
     fn test_parse_yymmdd_date_invalid_input() {
-        let result = Mt940::parse_yymmdd_date("2A0101");
+        let result = Mt940Statement::parse_yymmdd_date("2A0101");
         assert!(matches!(result, Err(ParseError::Mt940Error(_))));
     }
 
     #[test]
     fn test_parse_amount_comma() {
-        let result = Mt940::parse_amount("1540,50");
+        let result = Mt940Statement::parse_amount("1540,50");
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 1540.50);
     }
 
     #[test]
     fn test_parse_amount_dot() {
-        let result = Mt940::parse_amount("2500.75");
+        let result = Mt940Statement::parse_amount("2500.75");
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 2500.75);
     }
 
     #[test]
     fn test_parse_amount_trailing_comma() {
-        let result = Mt940::parse_amount("100,");
+        let result = Mt940Statement::parse_amount("100,");
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 100.00);
     }
 
     #[test]
     fn test_parse_balance_line() {
-        let result = Mt940::parse_balance_line("C200101EUR444,29");
+        let result = Mt940Statement::parse_balance_line("C200101EUR444,29");
         assert!(result.is_ok());
         let (amount, date, indicator, currency) = result.unwrap();
         assert_eq!(amount, 444.29);
@@ -563,7 +563,7 @@ mod tests {
 
     #[test]
     fn test_parse_balance_line_debit() {
-        let result = Mt940::parse_balance_line("D110707CHF100,");
+        let result = Mt940Statement::parse_balance_line("D110707CHF100,");
         assert!(result.is_ok());
         let (amount, date, indicator, currency) = result.unwrap();
         assert_eq!(amount, 100.00);
@@ -574,7 +574,7 @@ mod tests {
 
     #[test]
     fn test_parse_transaction_line() {
-        let result = Mt940::parse_transaction_line(
+        let result = Mt940Statement::parse_transaction_line(
             "2001010101D65,00NOVBNL47INGB9999999999",
             "Betaling sieraden",
         );
@@ -590,14 +590,14 @@ mod tests {
     fn test_parse_empty_mt940() {
         let input = "";
         let mut reader = input.as_bytes();
-        let result = Mt940::from_read(&mut reader);
+        let result = Mt940Statement::from_read(&mut reader);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_extract_block4() {
         let input = "{1:F01TEST}{2:I940}{4:\n:20:REF\n:25:ACC123\n-}";
-        let result = Mt940::extract_block4(input);
+        let result = Mt940Statement::extract_block4(input);
         assert!(result.is_ok());
         let block4 = result.unwrap();
         assert!(block4.contains(":20:REF"));
@@ -613,7 +613,7 @@ mod tests {
         path.push("../example_files/mt 940 gs.mt940");
 
         if let Ok(mut file) = File::open(&path) {
-            let result = Mt940::from_read(&mut file);
+            let result = Mt940Statement::from_read(&mut file);
 
             match result {
                 Ok(statement) => {
@@ -642,7 +642,7 @@ mod tests {
         path.push("../example_files/MT940 github 1.mt940");
 
         if let Ok(mut file) = File::open(&path) {
-            let result = Mt940::from_read(&mut file);
+            let result = Mt940Statement::from_read(&mut file);
 
             match result {
                 Ok(statement) => {
@@ -663,14 +663,14 @@ mod tests {
 
     #[test]
     fn test_mt940_write() {
-        let statement = Mt940 {
+        let statement = Mt940Statement {
             account_number: "NL81ASNB9999999999".into(),
             currency: "EUR".into(),
             opening_balance: 444.29,
-            opening_date: Mt940::parse_yymmdd_date("200101").unwrap(),
+            opening_date: Mt940Statement::parse_yymmdd_date("200101").unwrap(),
             opening_indicator: BalanceType::Credit,
             closing_balance: 379.29,
-            closing_date: Mt940::parse_yymmdd_date("200101").unwrap(),
+            closing_date: Mt940Statement::parse_yymmdd_date("200101").unwrap(),
             closing_indicator: BalanceType::Credit,
             transactions: vec![],
         };
