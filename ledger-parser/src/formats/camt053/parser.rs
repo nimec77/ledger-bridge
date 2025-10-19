@@ -261,7 +261,6 @@ impl CamtParser {
             let attr = attr
                 .map_err(|err| ParseError::Camt053Error(format!("XML attribute error: {}", err)))?;
 
-            // Convert attribute key to lowercase for case-insensitive comparison
             let key_str = std::str::from_utf8(attr.key.as_ref()).map_err(|err| {
                 ParseError::Camt053Error(format!("Invalid attribute key encoding: {}", err))
             })?;

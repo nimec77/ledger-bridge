@@ -5,8 +5,6 @@ use crate::formats::utils;
 use crate::model::{BalanceType, TransactionType};
 use crate::formats::camt053::camt053_const::*;
 
-
-
 /// Parse amount from string (handles both dot and comma as decimal separator)
 pub(super) fn parse_amount(s: &str) -> Result<f64, ParseError> {
     let cleaned = s.trim().replace(',', ".");
