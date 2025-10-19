@@ -1,17 +1,50 @@
-/// Error type for all parsing and formatting operations
+/// Error type for all parsing and formatting operations in the ledger-parser library.
+///
+/// This unified error type covers all possible error conditions that can occur
+/// during parsing, conversion, and writing of financial statement formats.
+///
+/// # Error Categories
+/// - **General errors**: Format validation, missing fields, invalid values
+/// - **Format-specific errors**: CSV, MT940, and CAMT.053 parsing errors
+/// - **I/O errors**: File reading/writing failures
+///
+/// # Example
+/// ```
+/// use ledger_parser::{Mt940Statement, ParseError};
+///
+/// fn parse_statement(data: &str) -> Result<Mt940Statement, ParseError> {
+///     let mut reader = data.as_bytes();
+///     Mt940Statement::from_read(&mut reader)
+/// }
+///
+/// match parse_statement("invalid") {
+///     Ok(_) => println!("Success"),
+///     Err(ParseError::Mt940Error(msg)) => eprintln!("MT940 parse error: {}", msg),
+///     Err(e) => eprintln!("Other error: {}", e),
+/// }
+/// ```
 #[derive(Debug)]
 pub enum ParseError {
-    // General errors
+    /// Invalid or unsupported format specified
     InvalidFormat(String),
+    /// Required field is missing from the input
     MissingField(String),
-    InvalidFieldValue { field: String, value: String },
+    /// Field value cannot be parsed or is invalid
+    InvalidFieldValue {
+        /// Name of the field that has an invalid value
+        field: String,
+        /// The invalid value that was encountered
+        value: String,
+    },
 
-    // Format-specific errors
+    /// CSV format parsing error
     CsvError(String),
+    /// MT940 format parsing error
     Mt940Error(String),
+    /// CAMT.053 XML format parsing error
     Camt053Error(String),
 
-    // I/O errors
+    /// I/O operation error (file reading/writing)
     IoError(String),
 }
 
