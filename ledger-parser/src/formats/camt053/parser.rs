@@ -5,9 +5,9 @@ use quick_xml::events::{BytesEnd, BytesStart};
 use crate::error::ParseError;
 use crate::model::{BalanceType, Transaction};
 
+use super::camt053_utils;
 use super::elements::ElementName;
 use super::scratch::{BalanceScratch, EntryScratch};
-use super::camt053_utils;
 
 #[derive(Default)]
 pub struct CamtParser {
@@ -258,12 +258,12 @@ impl CamtParser {
         for attr in attributes {
             let attr = attr
                 .map_err(|err| ParseError::Camt053Error(format!("XML attribute error: {}", err)))?;
-            
+
             // Convert attribute key to lowercase for case-insensitive comparison
             let key_str = std::str::from_utf8(attr.key.as_ref()).map_err(|err| {
                 ParseError::Camt053Error(format!("Invalid attribute key encoding: {}", err))
             })?;
-            
+
             if key_str.to_lowercase() == "ccy" {
                 let value = String::from_utf8(attr.value.as_ref().to_vec()).map_err(|err| {
                     ParseError::Camt053Error(format!("Invalid currency encoding: {}", err))

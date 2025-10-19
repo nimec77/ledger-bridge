@@ -45,7 +45,7 @@ impl ElementName {
             ParseError::Camt053Error(format!("Invalid XML tag name encoding: {}", err))
         })?;
         let normalized = name.rsplit(':').next().unwrap_or(name);
-        
+
         Ok(ElementName::from_name(normalized))
     }
 

@@ -63,14 +63,8 @@ mod tests {
 
     #[test]
     fn test_parse_balance_indicator() {
-        assert_eq!(
-            parse_balance_indicator(CRDT).unwrap(),
-            BalanceType::Credit
-        );
-        assert_eq!(
-            parse_balance_indicator(DBIT).unwrap(),
-            BalanceType::Debit
-        );
+        assert_eq!(parse_balance_indicator(CRDT).unwrap(), BalanceType::Credit);
+        assert_eq!(parse_balance_indicator(DBIT).unwrap(), BalanceType::Debit);
         assert!(parse_balance_indicator("INVALID").is_err());
     }
 
