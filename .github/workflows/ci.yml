@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  # Allow manual runs from the Actions tab
+  workflow_dispatch:
+    inputs:
+      rust_toolchain:
+        description: "Rust toolchain version (stable, beta, nightly, or specific)"
+        required: false
+        default: "stable"
+      run_tests:
+        description: "Run test suite? (true/false)"
+        required: false
+        default: "true"
+      run_lint:
+        description: "Run formatting and clippy checks? (true/false)"
+        required: false
+        default: "true"
+
+# Cancel previous runs of same branch
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    name: Setup Rust ${{ github.event.inputs.rust_toolchain || 'stable' }}
+    runs-on: ubuntu-latest
+    outputs:
+      toolchain: ${{ steps.set_toolchain.outputs.toolchain }}
+    steps:
+      - name: Set Rust toolchain
+        id: set_toolchain
+        run: |
+          TOOLCHAIN=${{ github.event.inputs.rust_toolchain }}
+          if [ -z "$TOOLCHAIN" ]; then TOOLCHAIN=stable; fi
+          echo "toolchain=$TOOLCHAIN" >> $GITHUB_OUTPUT
+      - name: Display selected toolchain
+        run: |
+          echo "Using Rust toolchain: ${{ steps.set_toolchain.outputs.toolchain }}"
+
+  lint:
+    name: Lint (fmt + clippy)
+    needs: setup
+    if: ${{ github.event.inputs.run_lint != 'false' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ needs.setup.outputs.toolchain }}
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+
+      - name: rustfmt check
+        run: cargo fmt --all -- --check
+
+      - name: clippy (deny warnings)
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+      - name: Build docs
+        run: cargo doc --no-deps
+
+  test:
+    name: Test suite (${{ matrix.os }})
+    needs: setup
+    if: ${{ github.event.inputs.run_tests != 'false' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ needs.setup.outputs.toolchain }}
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+
+      - name: Run tests
+        run: cargo test --workspace --all-features -- --nocapture

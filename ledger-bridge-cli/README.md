@@ -189,15 +189,6 @@ for file in *.csv; do
 done
 ```
 
-### Validation
-
-```bash
-# Round-trip test to verify data integrity
-ledger-bridge-cli --in-format csv --out-format mt940 -i original.csv -o temp.mt940
-ledger-bridge-cli --in-format mt940 --out-format csv -i temp.mt940 -o roundtrip.csv
-diff original.csv roundtrip.csv
-```
-
 ## Tips and Tricks
 
 ### 1. Using with `jq` for JSON Processing
