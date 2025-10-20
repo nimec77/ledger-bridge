@@ -3,8 +3,10 @@ name: CI
 on:
   push:
     branches: [ main ]
+    paths: [ '**.rs', '**/Cargo.toml', '**/Cargo.lock' ]
   pull_request:
     branches: [ main ]
+    paths: [ '**.rs', '**/Cargo.toml', '**/Cargo.lock' ]
   # Allow manual runs from the Actions tab
   workflow_dispatch:
     inputs:
