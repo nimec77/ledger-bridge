@@ -18,7 +18,6 @@ pub(crate) fn parse_date(date_str: &str) -> Result<DateTime<FixedOffset>, ParseE
             let ndt = date
                 .and_hms_opt(0, 0, 0)
                 .ok_or(ParseError::InvalidFormat("Invalid date".into()))?;
-            
             return Ok(DateTime::<FixedOffset>::from_naive_utc_and_offset(
                 ndt,
                 Utc.fix(),
