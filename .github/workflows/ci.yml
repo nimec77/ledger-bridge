@@ -45,21 +45,20 @@ jobs:
           if [ -z "$TOOLCHAIN" ]; then TOOLCHAIN=stable; fi
           echo "toolchain=$TOOLCHAIN" >> $GITHUB_OUTPUT
       - name: Display selected toolchain
-        run: |
-          echo "Using Rust toolchain: ${{ steps.set_toolchain.outputs.toolchain }}"
+        run: echo "Using Rust toolchain: ${{ steps.set_toolchain.outputs.toolchain }}"
 
+  # ---- AUTO on PR/commit, and also available in manual runs ----
   lint:
-    name: Lint (fmt + clippy)
+    name: Lint (fmt + clippy) [Linux]
     needs: setup
-    if: ${{ github.event.inputs.run_lint != 'false' }}
+    if: ${{ github.event.inputs.run_lint != 'false' || github.event_name != 'workflow_dispatch' }}
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ needs.setup.outputs.toolchain }}
           components: rustfmt, clippy
@@ -79,22 +78,45 @@ jobs:
       - name: Build docs
         run: cargo doc --no-deps
 
-  test:
-    name: Test suite (${{ matrix.os }})
+  test_linux:
+    name: Tests [Linux]
     needs: setup
-    if: ${{ github.event.inputs.run_tests != 'false' }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-
+    if: ${{ github.event.inputs.run_tests != 'false' || github.event_name != 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ needs.setup.outputs.toolchain }}
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+
+      - name: Run tests
+        run: cargo test --workspace --all-features -- --nocapture
+
+  # ---- MANUAL-ONLY: extra OSes (won't run on PR/commit) ----
+  test_extra_os:
+    name: Tests [${{ matrix.os }}] (manual only)
+    needs: setup
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.run_tests != 'false' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ macos-latest, windows-latest ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ needs.setup.outputs.toolchain }}
 
