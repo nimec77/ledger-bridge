@@ -45,7 +45,8 @@ jobs:
           if [ -z "$TOOLCHAIN" ]; then TOOLCHAIN=stable; fi
           echo "toolchain=$TOOLCHAIN" >> $GITHUB_OUTPUT
       - name: Display selected toolchain
-        run: echo "Using Rust toolchain: ${{ steps.set_toolchain.outputs.toolchain }}"
+        run: |
+          echo "Using Rust toolchain: ${{ steps.set_toolchain.outputs.toolchain }}"
 
   # ---- AUTO on PR/commit, and also available in manual runs ----
   lint:
