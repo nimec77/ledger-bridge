@@ -1,5 +1,3 @@
-#![warn(missing_docs)]
-
 //! Ledger Bridge Parser Library
 //!
 //! A library for parsing and converting financial data between CSV, MT940, and CAMT.053 formats.
@@ -102,6 +100,8 @@
 //!     Err(e) => eprintln!("Other error: {}", e),
 //! }
 //! ```
+
+#![warn(missing_docs)]
 
 mod error;
 mod model;

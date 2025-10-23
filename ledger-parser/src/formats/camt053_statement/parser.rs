@@ -264,7 +264,7 @@ impl CamtParser {
                 ParseError::Camt053Error(format!("Invalid attribute key encoding: {}", err))
             })?;
 
-            if key_str.to_uppercase().as_str() == CCY_TAG {
+            if key_str == ElementName::Currency.to_string() {
                 let value = String::from_utf8(attr.value.as_ref().to_vec()).map_err(|err| {
                     ParseError::Camt053Error(format!("Invalid currency encoding: {}", err))
                 })?;
