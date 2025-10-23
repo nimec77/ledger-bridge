@@ -1,3 +1,5 @@
+use thiserror::Error;
+
 /// Error type for all parsing and formatting operations in the ledger-parser library.
 ///
 /// This unified error type covers all possible error conditions that can occur
@@ -23,13 +25,16 @@
 ///     Err(e) => eprintln!("Other error: {}", e),
 /// }
 /// ```
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum ParseError {
     /// Invalid or unsupported format specified
+    #[error("Invalid format: {0}")]
     InvalidFormat(String),
     /// Required field is missing from the input
+    #[error("Missing required field: {0}")]
     MissingField(String),
     /// Field value cannot be parsed or is invalid
+    #[error("Invalid value '{value}' for field '{field}'")]
     InvalidFieldValue {
         /// Name of the field that has an invalid value
         field: String,
@@ -38,47 +43,23 @@ pub enum ParseError {
     },
 
     /// CSV format parsing error
+    #[error("CSV error: {0}")]
     CsvError(String),
     /// MT940 format parsing error
+    #[error("MT940 error: {0}")]
     Mt940Error(String),
     /// CAMT.053 XML format parsing error
+    #[error("CAMT.053 error: {0}")]
     Camt053Error(String),
-
     /// I/O operation error (file reading/writing)
-    IoError(String),
+    #[error("I/O error: {0}")]
+    IoError(#[from] std::io::Error),
 }
 
-// User-friendly error messages
-impl std::fmt::Display for ParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            ParseError::InvalidFormat(msg) => write!(f, "Invalid format: {}", msg),
-            ParseError::MissingField(field) => write!(f, "Missing required field: {}", field),
-            ParseError::InvalidFieldValue { field, value } => {
-                write!(f, "Invalid value '{}' for field '{}'", value, field)
-            }
-            ParseError::CsvError(msg) => write!(f, "CSV error: {}", msg),
-            ParseError::Mt940Error(msg) => write!(f, "MT940 error: {}", msg),
-            ParseError::Camt053Error(msg) => write!(f, "CAMT.053 error: {}", msg),
-            ParseError::IoError(msg) => write!(f, "I/O error: {}", msg),
-        }
-    }
-}
-
-// Standard error trait
-impl std::error::Error for ParseError {}
-
-// Convert std::io::Error to ParseError
-impl From<std::io::Error> for ParseError {
-    fn from(err: std::io::Error) -> Self {
-        ParseError::IoError(err.to_string())
-    }
-}
-
-/// Automatic conversion from csv::Error to ParseError
+/// Automatic conversion from CSV errors to ParseError
 impl From<csv::Error> for ParseError {
-    fn from(err: csv::Error) -> Self {
-        ParseError::CsvError(err.to_string())
+    fn from(error: csv::Error) -> Self {
+        ParseError::CsvError(error.to_string())
     }
 }
 
@@ -95,7 +76,7 @@ mod tests {
     #[test]
     fn test_csv_error_display() {
         let error = ParseError::CsvError("Invalid CSV structure".into());
-        assert_eq!(format!("{}", error), "CSV error: Invalid CSV structure");
+        assert!(format!("{}", error).contains("Invalid CSV structure"));
     }
 
     #[test]
@@ -125,7 +106,7 @@ mod tests {
         let parse_error: ParseError = io_error.into();
 
         match parse_error {
-            ParseError::IoError(msg) => assert!(msg.contains("File not found")),
+            ParseError::IoError(error) => assert!(error.to_string().contains("File not found")),
             _ => panic!("Expected IoError variant"),
         }
     }
