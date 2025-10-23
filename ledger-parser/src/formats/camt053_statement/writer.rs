@@ -4,6 +4,7 @@ use quick_xml::Writer;
 use std::io::Write;
 
 use crate::formats::camt053_statement::camt053_const::*;
+use crate::formats::camt053_statement::elements::ElementName;
 use crate::model::{BalanceType, Transaction, TransactionType};
 
 use super::{Camt053Statement, ParseError};
@@ -35,7 +36,7 @@ impl<'a, W: Write> CamtWriter<'a, W> {
                 ParseError::Camt053Error(format!("Failed to write XML declaration: {}", e))
             })?;
 
-        let mut document = BytesStart::new(DOCUMENT_TAG);
+        let mut document = BytesStart::new(ElementName::Document.to_string());
         document.push_attribute(("xmlns", "urn:iso:std:iso:20022:tech:xsd:camt.053.001.02"));
         self.writer
             .write_event(Event::Start(document))
@@ -48,19 +49,21 @@ impl<'a, W: Write> CamtWriter<'a, W> {
 
     fn write_document_end(&mut self) -> Result<(), ParseError> {
         self.writer
-            .write_event(Event::End(BytesEnd::new(DOCUMENT_TAG)))
+            .write_event(Event::End(BytesEnd::new(ElementName::Document.to_string())))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to close Document tag: {}", e)))
     }
 
     fn write_statement(&mut self) -> Result<(), ParseError> {
         self.writer
-            .write_event(Event::Start(BytesStart::new(BK_TO_CSTM_STMT_TAG)))
+            .write_event(Event::Start(BytesStart::new(
+                ElementName::BkToCstmrStmt.to_string(),
+            )))
             .map_err(|e| {
                 ParseError::Camt053Error(format!("Failed to write BkToCstmrStmt tag: {}", e))
             })?;
 
         self.writer
-            .write_event(Event::Start(BytesStart::new(STMT_TAG)))
+            .write_event(Event::Start(BytesStart::new(ElementName::Stmt.to_string())))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to write Stmt tag: {}", e)))?;
 
         self.write_account()?;
@@ -68,11 +71,13 @@ impl<'a, W: Write> CamtWriter<'a, W> {
         self.write_entries()?;
 
         self.writer
-            .write_event(Event::End(BytesEnd::new(STMT_TAG)))
+            .write_event(Event::End(BytesEnd::new(ElementName::Stmt.to_string())))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to close Stmt tag: {}", e)))?;
 
         self.writer
-            .write_event(Event::End(BytesEnd::new(BK_TO_CSTM_STMT_TAG)))
+            .write_event(Event::End(BytesEnd::new(
+                ElementName::BkToCstmrStmt.to_string(),
+            )))
             .map_err(|e| {
                 ParseError::Camt053Error(format!("Failed to close BkToCstmrStmt tag: {}", e))
             })?;
@@ -82,15 +87,15 @@ impl<'a, W: Write> CamtWriter<'a, W> {
 
     fn write_account(&mut self) -> Result<(), ParseError> {
         self.writer
-            .write_event(Event::Start(BytesStart::new(ACCT_TAG)))
+            .write_event(Event::Start(BytesStart::new(ElementName::Acct.to_string())))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to write Acct tag: {}", e)))?;
 
         self.writer
-            .write_event(Event::Start(BytesStart::new(ID_TAG)))
+            .write_event(Event::Start(BytesStart::new(ElementName::Id.to_string())))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to write Id tag: {}", e)))?;
 
         self.writer
-            .write_event(Event::Start(BytesStart::new(IBAN_TAG)))
+            .write_event(Event::Start(BytesStart::new(ElementName::Iban.to_string())))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to write IBAN tag: {}", e)))?;
 
         self.writer
@@ -100,15 +105,17 @@ impl<'a, W: Write> CamtWriter<'a, W> {
             })?;
 
         self.writer
-            .write_event(Event::End(BytesEnd::new(IBAN_TAG)))
+            .write_event(Event::End(BytesEnd::new(ElementName::Iban.to_string())))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to close IBAN tag: {}", e)))?;
 
         self.writer
-            .write_event(Event::End(BytesEnd::new(ID_TAG)))
+            .write_event(Event::End(BytesEnd::new(ElementName::Id.to_string())))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to close Id tag: {}", e)))?;
 
         self.writer
-            .write_event(Event::Start(BytesStart::new(CCY_TAG)))
+            .write_event(Event::Start(BytesStart::new(
+                ElementName::Currency.to_string(),
+            )))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to write Ccy tag: {}", e)))?;
 
         self.writer
@@ -116,11 +123,11 @@ impl<'a, W: Write> CamtWriter<'a, W> {
             .map_err(|e| ParseError::Camt053Error(format!("Failed to write currency: {}", e)))?;
 
         self.writer
-            .write_event(Event::End(BytesEnd::new(CCY_TAG)))
+            .write_event(Event::End(BytesEnd::new(ElementName::Currency.to_string())))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to close Ccy tag: {}", e)))?;
 
         self.writer
-            .write_event(Event::End(BytesEnd::new(ACCT_TAG)))
+            .write_event(Event::End(BytesEnd::new(ElementName::Acct.to_string())))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to close Acct tag: {}", e)))?;
 
         Ok(())
@@ -152,21 +159,27 @@ impl<'a, W: Write> CamtWriter<'a, W> {
         date: &DateTime<FixedOffset>,
     ) -> Result<(), ParseError> {
         self.writer
-            .write_event(Event::Start(BytesStart::new(BAL_TAG)))
+            .write_event(Event::Start(BytesStart::new(
+                ElementName::Balance.to_string(),
+            )))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to write Bal tag: {}", e)))?;
 
         self.writer
-            .write_event(Event::Start(BytesStart::new(TP_TAG)))
+            .write_event(Event::Start(BytesStart::new(
+                ElementName::BalanceType.to_string(),
+            )))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to write Tp tag: {}", e)))?;
 
         self.writer
-            .write_event(Event::Start(BytesStart::new(CD_OR_PRTY_TAG)))
+            .write_event(Event::Start(BytesStart::new(
+                ElementName::CodeOrProprietary.to_string(),
+            )))
             .map_err(|e| {
                 ParseError::Camt053Error(format!("Failed to write CdOrPrtry tag: {}", e))
             })?;
 
         self.writer
-            .write_event(Event::Start(BytesStart::new(CD_TAG)))
+            .write_event(Event::Start(BytesStart::new(ElementName::Code.to_string())))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to write Cd tag: {}", e)))?;
 
         self.writer
@@ -176,20 +189,24 @@ impl<'a, W: Write> CamtWriter<'a, W> {
             })?;
 
         self.writer
-            .write_event(Event::End(BytesEnd::new(CD_TAG)))
+            .write_event(Event::End(BytesEnd::new(ElementName::Code.to_string())))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to close Cd tag: {}", e)))?;
 
         self.writer
-            .write_event(Event::End(BytesEnd::new(CD_OR_PRTY_TAG)))
+            .write_event(Event::End(BytesEnd::new(
+                ElementName::CodeOrProprietary.to_string(),
+            )))
             .map_err(|e| {
                 ParseError::Camt053Error(format!("Failed to close CdOrPrtry tag: {}", e))
             })?;
 
         self.writer
-            .write_event(Event::End(BytesEnd::new(TP_TAG)))
+            .write_event(Event::End(BytesEnd::new(
+                ElementName::BalanceType.to_string(),
+            )))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to close Tp tag: {}", e)))?;
 
-        let mut amt_tag = BytesStart::new(AMT_TAG);
+        let mut amt_tag = BytesStart::new(ElementName::Amount.to_string());
         amt_tag.push_attribute(("Ccy", self.statement.currency.as_str()));
         self.writer
             .write_event(Event::Start(amt_tag))
@@ -200,11 +217,13 @@ impl<'a, W: Write> CamtWriter<'a, W> {
             .map_err(|e| ParseError::Camt053Error(format!("Failed to write amount: {}", e)))?;
 
         self.writer
-            .write_event(Event::End(BytesEnd::new(AMT_TAG)))
+            .write_event(Event::End(BytesEnd::new(ElementName::Amount.to_string())))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to close Amt tag: {}", e)))?;
 
         self.writer
-            .write_event(Event::Start(BytesStart::new(CDT_DBT_IND_TAG)))
+            .write_event(Event::Start(BytesStart::new(
+                ElementName::CreditDebit.to_string(),
+            )))
             .map_err(|e| {
                 ParseError::Camt053Error(format!("Failed to write CdtDbtInd tag: {}", e))
             })?;
@@ -218,17 +237,19 @@ impl<'a, W: Write> CamtWriter<'a, W> {
             .map_err(|e| ParseError::Camt053Error(format!("Failed to write indicator: {}", e)))?;
 
         self.writer
-            .write_event(Event::End(BytesEnd::new(CDT_DBT_IND_TAG)))
+            .write_event(Event::End(BytesEnd::new(
+                ElementName::CreditDebit.to_string(),
+            )))
             .map_err(|e| {
                 ParseError::Camt053Error(format!("Failed to close CdtDbtInd tag: {}", e))
             })?;
 
         self.writer
-            .write_event(Event::Start(BytesStart::new(DT_TAG)))
+            .write_event(Event::Start(BytesStart::new(ElementName::Date.to_string())))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to write Dt tag: {}", e)))?;
 
         self.writer
-            .write_event(Event::Start(BytesStart::new(DT_TAG)))
+            .write_event(Event::Start(BytesStart::new(ElementName::Date.to_string())))
             .map_err(|e| {
                 ParseError::Camt053Error(format!("Failed to write inner Dt tag: {}", e))
             })?;
@@ -240,17 +261,17 @@ impl<'a, W: Write> CamtWriter<'a, W> {
             .map_err(|e| ParseError::Camt053Error(format!("Failed to write date: {}", e)))?;
 
         self.writer
-            .write_event(Event::End(BytesEnd::new(DT_TAG)))
+            .write_event(Event::End(BytesEnd::new(ElementName::Date.to_string())))
             .map_err(|e| {
                 ParseError::Camt053Error(format!("Failed to close inner Dt tag: {}", e))
             })?;
 
         self.writer
-            .write_event(Event::End(BytesEnd::new(DT_TAG)))
+            .write_event(Event::End(BytesEnd::new(ElementName::Date.to_string())))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to close Dt tag: {}", e)))?;
 
         self.writer
-            .write_event(Event::End(BytesEnd::new(BAL_TAG)))
+            .write_event(Event::End(BytesEnd::new(ElementName::Balance.to_string())))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to close Bal tag: {}", e)))?;
 
         Ok(())
@@ -269,11 +290,15 @@ impl<'a, W: Write> CamtWriter<'a, W> {
         entry_ref: usize,
     ) -> Result<(), ParseError> {
         self.writer
-            .write_event(Event::Start(BytesStart::new(NTRY_TAG)))
+            .write_event(Event::Start(BytesStart::new(
+                ElementName::Entry.to_string(),
+            )))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to write Ntry tag: {}", e)))?;
 
         self.writer
-            .write_event(Event::Start(BytesStart::new(NTRY_REF_TAG)))
+            .write_event(Event::Start(BytesStart::new(
+                ElementName::EntryRef.to_string(),
+            )))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to write NtryRef tag: {}", e)))?;
 
         self.writer
@@ -283,10 +308,10 @@ impl<'a, W: Write> CamtWriter<'a, W> {
             })?;
 
         self.writer
-            .write_event(Event::End(BytesEnd::new(NTRY_REF_TAG)))
+            .write_event(Event::End(BytesEnd::new(ElementName::EntryRef.to_string())))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to close NtryRef tag: {}", e)))?;
 
-        let mut amt_tag = BytesStart::new(AMT_TAG);
+        let mut amt_tag = BytesStart::new(ElementName::Amount.to_string());
         amt_tag.push_attribute(("Ccy", self.statement.currency.as_str()));
         self.writer
             .write_event(Event::Start(amt_tag))
@@ -302,11 +327,13 @@ impl<'a, W: Write> CamtWriter<'a, W> {
             })?;
 
         self.writer
-            .write_event(Event::End(BytesEnd::new(AMT_TAG)))
+            .write_event(Event::End(BytesEnd::new(ElementName::Amount.to_string())))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to close Amt tag: {}", e)))?;
 
         self.writer
-            .write_event(Event::Start(BytesStart::new(CDT_DBT_IND_TAG)))
+            .write_event(Event::Start(BytesStart::new(
+                ElementName::CreditDebit.to_string(),
+            )))
             .map_err(|e| {
                 ParseError::Camt053Error(format!("Failed to write CdtDbtInd tag: {}", e))
             })?;
@@ -322,17 +349,21 @@ impl<'a, W: Write> CamtWriter<'a, W> {
             })?;
 
         self.writer
-            .write_event(Event::End(BytesEnd::new(CDT_DBT_IND_TAG)))
+            .write_event(Event::End(BytesEnd::new(
+                ElementName::CreditDebit.to_string(),
+            )))
             .map_err(|e| {
                 ParseError::Camt053Error(format!("Failed to close CdtDbtInd tag: {}", e))
             })?;
 
         self.writer
-            .write_event(Event::Start(BytesStart::new(BOOKG_DT_TAG)))
+            .write_event(Event::Start(BytesStart::new(
+                ElementName::BookingDate.to_string(),
+            )))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to write BookgDt tag: {}", e)))?;
 
         self.writer
-            .write_event(Event::Start(BytesStart::new(DT_TAG)))
+            .write_event(Event::Start(BytesStart::new(ElementName::Date.to_string())))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to write Dt tag: {}", e)))?;
 
         self.writer
@@ -344,22 +375,26 @@ impl<'a, W: Write> CamtWriter<'a, W> {
             })?;
 
         self.writer
-            .write_event(Event::End(BytesEnd::new(DT_TAG)))
+            .write_event(Event::End(BytesEnd::new(ElementName::Date.to_string())))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to close Dt tag: {}", e)))?;
 
         self.writer
-            .write_event(Event::End(BytesEnd::new(BOOKG_DT_TAG)))
+            .write_event(Event::End(BytesEnd::new(
+                ElementName::BookingDate.to_string(),
+            )))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to close BookgDt tag: {}", e)))?;
 
         if let Some(value_date) = transaction.value_date.as_ref() {
             self.writer
-                .write_event(Event::Start(BytesStart::new(VAL_DT_TAG)))
+                .write_event(Event::Start(BytesStart::new(
+                    ElementName::ValueDate.to_string(),
+                )))
                 .map_err(|e| {
                     ParseError::Camt053Error(format!("Failed to write ValDt tag: {}", e))
                 })?;
 
             self.writer
-                .write_event(Event::Start(BytesStart::new(DT_TAG)))
+                .write_event(Event::Start(BytesStart::new(ElementName::Date.to_string())))
                 .map_err(|e| ParseError::Camt053Error(format!("Failed to write Dt tag: {}", e)))?;
 
             self.writer
@@ -369,36 +404,46 @@ impl<'a, W: Write> CamtWriter<'a, W> {
                 })?;
 
             self.writer
-                .write_event(Event::End(BytesEnd::new(DT_TAG)))
+                .write_event(Event::End(BytesEnd::new(ElementName::Date.to_string())))
                 .map_err(|e| ParseError::Camt053Error(format!("Failed to close Dt tag: {}", e)))?;
 
             self.writer
-                .write_event(Event::End(BytesEnd::new(VAL_DT_TAG)))
+                .write_event(Event::End(BytesEnd::new(
+                    ElementName::ValueDate.to_string(),
+                )))
                 .map_err(|e| {
                     ParseError::Camt053Error(format!("Failed to close ValDt tag: {}", e))
                 })?;
         }
 
         self.writer
-            .write_event(Event::Start(BytesStart::new(NTRY_DTLS_TAG)))
+            .write_event(Event::Start(BytesStart::new(
+                ElementName::EntryDetails.to_string(),
+            )))
             .map_err(|e| {
                 ParseError::Camt053Error(format!("Failed to write NtryDtls tag: {}", e))
             })?;
 
         self.writer
-            .write_event(Event::Start(BytesStart::new(TX_DTLS_TAG)))
+            .write_event(Event::Start(BytesStart::new(
+                ElementName::TransactionDetails.to_string(),
+            )))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to write TxDtls tag: {}", e)))?;
 
         if transaction.reference.is_some() {
             self.writer
-                .write_event(Event::Start(BytesStart::new(REFS_TAG)))
+                .write_event(Event::Start(BytesStart::new(
+                    ElementName::References.to_string(),
+                )))
                 .map_err(|e| {
                     ParseError::Camt053Error(format!("Failed to write Refs tag: {}", e))
                 })?;
 
             if let Some(reference) = transaction.reference.as_ref() {
                 self.writer
-                    .write_event(Event::Start(BytesStart::new(TX_ID_TAG)))
+                    .write_event(Event::Start(BytesStart::new(
+                        ElementName::TransactionId.to_string(),
+                    )))
                     .map_err(|e| {
                         ParseError::Camt053Error(format!("Failed to write TxId tag: {}", e))
                     })?;
@@ -410,14 +455,18 @@ impl<'a, W: Write> CamtWriter<'a, W> {
                     })?;
 
                 self.writer
-                    .write_event(Event::End(BytesEnd::new(TX_ID_TAG)))
+                    .write_event(Event::End(BytesEnd::new(
+                        ElementName::TransactionId.to_string(),
+                    )))
                     .map_err(|e| {
                         ParseError::Camt053Error(format!("Failed to close TxId tag: {}", e))
                     })?;
             }
 
             self.writer
-                .write_event(Event::End(BytesEnd::new(REFS_TAG)))
+                .write_event(Event::End(BytesEnd::new(
+                    ElementName::References.to_string(),
+                )))
                 .map_err(|e| {
                     ParseError::Camt053Error(format!("Failed to close Refs tag: {}", e))
                 })?;
@@ -425,23 +474,25 @@ impl<'a, W: Write> CamtWriter<'a, W> {
 
         if transaction.counterparty_name.is_some() || transaction.counterparty_account.is_some() {
             self.writer
-                .write_event(Event::Start(BytesStart::new(RLT_PTIES_TAG)))
+                .write_event(Event::Start(BytesStart::new(
+                    ElementName::RelatedParties.to_string(),
+                )))
                 .map_err(|e| {
                     ParseError::Camt053Error(format!("Failed to write RltdPties tag: {}", e))
                 })?;
 
             let party_tag = match transaction.transaction_type {
-                TransactionType::Credit => DBTR_TAG,
-                TransactionType::Debit => CDTR_TAG,
+                TransactionType::Credit => ElementName::Debtor.to_string(),
+                TransactionType::Debit => ElementName::Creditor.to_string(),
             };
             let account_tag = match transaction.transaction_type {
-                TransactionType::Credit => DBTR_ACCT_TAG,
-                TransactionType::Debit => CDTR_ACCT_TAG,
+                TransactionType::Credit => ElementName::DebtorAccount.to_string(),
+                TransactionType::Debit => ElementName::CreditorAccount.to_string(),
             };
 
             if let Some(counterparty_name) = transaction.counterparty_name.as_ref() {
                 self.writer
-                    .write_event(Event::Start(BytesStart::new(party_tag)))
+                    .write_event(Event::Start(BytesStart::new(party_tag.clone())))
                     .map_err(|e| {
                         ParseError::Camt053Error(format!(
                             "Failed to write {} tag: {}",
@@ -450,7 +501,7 @@ impl<'a, W: Write> CamtWriter<'a, W> {
                     })?;
 
                 self.writer
-                    .write_event(Event::Start(BytesStart::new(NM_TAG)))
+                    .write_event(Event::Start(BytesStart::new(ElementName::Name.to_string())))
                     .map_err(|e| {
                         ParseError::Camt053Error(format!("Failed to write Nm tag: {}", e))
                     })?;
@@ -465,13 +516,13 @@ impl<'a, W: Write> CamtWriter<'a, W> {
                     })?;
 
                 self.writer
-                    .write_event(Event::End(BytesEnd::new(NM_TAG)))
+                    .write_event(Event::End(BytesEnd::new(ElementName::Name.to_string())))
                     .map_err(|e| {
                         ParseError::Camt053Error(format!("Failed to close Nm tag: {}", e))
                     })?;
 
                 self.writer
-                    .write_event(Event::End(BytesEnd::new(party_tag)))
+                    .write_event(Event::End(BytesEnd::new(party_tag.clone())))
                     .map_err(|e| {
                         ParseError::Camt053Error(format!(
                             "Failed to close {} tag: {}",
@@ -482,7 +533,7 @@ impl<'a, W: Write> CamtWriter<'a, W> {
 
             if let Some(counterparty_account) = transaction.counterparty_account.as_ref() {
                 self.writer
-                    .write_event(Event::Start(BytesStart::new(account_tag)))
+                    .write_event(Event::Start(BytesStart::new(account_tag.clone())))
                     .map_err(|e| {
                         ParseError::Camt053Error(format!(
                             "Failed to write {} tag: {}",
@@ -491,13 +542,13 @@ impl<'a, W: Write> CamtWriter<'a, W> {
                     })?;
 
                 self.writer
-                    .write_event(Event::Start(BytesStart::new(ID_TAG)))
+                    .write_event(Event::Start(BytesStart::new(ElementName::Id.to_string())))
                     .map_err(|e| {
                         ParseError::Camt053Error(format!("Failed to write Id tag: {}", e))
                     })?;
 
                 self.writer
-                    .write_event(Event::Start(BytesStart::new(IBAN_TAG)))
+                    .write_event(Event::Start(BytesStart::new(ElementName::Iban.to_string())))
                     .map_err(|e| {
                         ParseError::Camt053Error(format!("Failed to write IBAN tag: {}", e))
                     })?;
@@ -512,19 +563,19 @@ impl<'a, W: Write> CamtWriter<'a, W> {
                     })?;
 
                 self.writer
-                    .write_event(Event::End(BytesEnd::new(IBAN_TAG)))
+                    .write_event(Event::End(BytesEnd::new(ElementName::Iban.to_string())))
                     .map_err(|e| {
                         ParseError::Camt053Error(format!("Failed to close IBAN tag: {}", e))
                     })?;
 
                 self.writer
-                    .write_event(Event::End(BytesEnd::new(ID_TAG)))
+                    .write_event(Event::End(BytesEnd::new(ElementName::Id.to_string())))
                     .map_err(|e| {
                         ParseError::Camt053Error(format!("Failed to close Id tag: {}", e))
                     })?;
 
                 self.writer
-                    .write_event(Event::End(BytesEnd::new(account_tag)))
+                    .write_event(Event::End(BytesEnd::new(account_tag.clone())))
                     .map_err(|e| {
                         ParseError::Camt053Error(format!(
                             "Failed to close {} tag: {}",
@@ -534,7 +585,9 @@ impl<'a, W: Write> CamtWriter<'a, W> {
             }
 
             self.writer
-                .write_event(Event::End(BytesEnd::new(RLT_PTIES_TAG)))
+                .write_event(Event::End(BytesEnd::new(
+                    ElementName::RelatedParties.to_string(),
+                )))
                 .map_err(|e| {
                     ParseError::Camt053Error(format!("Failed to close RltdPties tag: {}", e))
                 })?;
@@ -542,13 +595,17 @@ impl<'a, W: Write> CamtWriter<'a, W> {
 
         if !transaction.description.is_empty() {
             self.writer
-                .write_event(Event::Start(BytesStart::new(RMT_INF_TAG)))
+                .write_event(Event::Start(BytesStart::new(
+                    ElementName::RemittanceInfo.to_string(),
+                )))
                 .map_err(|e| {
                     ParseError::Camt053Error(format!("Failed to write RmtInf tag: {}", e))
                 })?;
 
             self.writer
-                .write_event(Event::Start(BytesStart::new(USTRD_TAG)))
+                .write_event(Event::Start(BytesStart::new(
+                    ElementName::UnstructuredRemittance.to_string(),
+                )))
                 .map_err(|e| {
                     ParseError::Camt053Error(format!("Failed to write Ustrd tag: {}", e))
                 })?;
@@ -560,30 +617,38 @@ impl<'a, W: Write> CamtWriter<'a, W> {
                 })?;
 
             self.writer
-                .write_event(Event::End(BytesEnd::new(USTRD_TAG)))
+                .write_event(Event::End(BytesEnd::new(
+                    ElementName::UnstructuredRemittance.to_string(),
+                )))
                 .map_err(|e| {
                     ParseError::Camt053Error(format!("Failed to close Ustrd tag: {}", e))
                 })?;
 
             self.writer
-                .write_event(Event::End(BytesEnd::new(RMT_INF_TAG)))
+                .write_event(Event::End(BytesEnd::new(
+                    ElementName::RemittanceInfo.to_string(),
+                )))
                 .map_err(|e| {
                     ParseError::Camt053Error(format!("Failed to close RmtInf tag: {}", e))
                 })?;
         }
 
         self.writer
-            .write_event(Event::End(BytesEnd::new(TX_DTLS_TAG)))
+            .write_event(Event::End(BytesEnd::new(
+                ElementName::TransactionDetails.to_string(),
+            )))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to close TxDtls tag: {}", e)))?;
 
         self.writer
-            .write_event(Event::End(BytesEnd::new(NTRY_DTLS_TAG)))
+            .write_event(Event::End(BytesEnd::new(
+                ElementName::EntryDetails.to_string(),
+            )))
             .map_err(|e| {
                 ParseError::Camt053Error(format!("Failed to close NtryDtls tag: {}", e))
             })?;
 
         self.writer
-            .write_event(Event::End(BytesEnd::new(NTRY_TAG)))
+            .write_event(Event::End(BytesEnd::new(ElementName::Entry.to_string())))
             .map_err(|e| ParseError::Camt053Error(format!("Failed to close Ntry tag: {}", e)))?;
 
         Ok(())
