@@ -20,14 +20,23 @@ use crate::model::{BalanceType, Transaction};
 /// Fields are identical to Mt940/CsvStatement for seamless conversions.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Camt053Statement {
+    /// Account number (IBAN or local format) from the bank statement
     pub account_number: String,
+    /// Three-letter ISO 4217 currency code (e.g., USD, EUR, RUB)
     pub currency: String,
+    /// Opening balance amount at the start of the statement period
     pub opening_balance: f64,
+    /// Date and time of the opening balance
     pub opening_date: DateTime<FixedOffset>,
+    /// Opening balance type (Credit or Debit indicator)
     pub opening_indicator: BalanceType,
+    /// Closing balance amount at the end of the statement period
     pub closing_balance: f64,
+    /// Date and time of the closing balance
     pub closing_date: DateTime<FixedOffset>,
+    /// Closing balance type (Credit or Debit indicator)
     pub closing_indicator: BalanceType,
+    /// List of transactions in chronological order
     pub transactions: Vec<Transaction>,
 }
 
