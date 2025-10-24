@@ -1,6 +1,6 @@
 use chrono::{DateTime, FixedOffset, NaiveDate, Offset, Utc};
 
-use crate::ParseError;
+use crate::{formats::formats_const::*, ParseError};
 
 pub(crate) fn parse_date(date_str: &str) -> Result<DateTime<FixedOffset>, ParseError> {
     let formats = vec![
@@ -26,4 +26,20 @@ pub(crate) fn parse_date(date_str: &str) -> Result<DateTime<FixedOffset>, ParseE
     }
 
     Err(ParseError::InvalidFormat("Invalid date".into()))
+}
+
+pub(crate) fn parse_amount(amount_str: &str) -> Result<f64, ParseError> {
+    let trimmed = amount_str.trim();
+    if trimmed.is_empty() {
+        return Ok(ZERO_AMOUNT);
+    }
+
+    // Replace comma with dot and remove spaces
+    let normalized = trimmed
+        .replace(DECIMAL_SEPARATOR_COMMA, DECIMAL_SEPARATOR_DOT)
+        .replace(' ', "");
+
+    normalized
+        .parse::<f64>()
+        .map_err(|_| ParseError::CsvError(format!("Invalid amount: {}", amount_str)))
 }
