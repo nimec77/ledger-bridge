@@ -1,4 +1,4 @@
-use crate::{BalanceType, ParseError, Transaction, TransactionType};
+use crate::{formats::utils, BalanceType, ParseError, Transaction, TransactionType};
 use chrono::{DateTime, FixedOffset, NaiveDate, Offset, Utc};
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
@@ -475,24 +475,7 @@ impl Mt940Statement {
 
     /// Parse amount (handle both comma and dot as decimal separator)
     fn parse_amount(amount_str: &str) -> Result<f64, ParseError> {
-        let trimmed = amount_str.trim();
-
-        if trimmed.is_empty() {
-            return Ok(0.0);
-        }
-
-        // Replace comma with dot, remove spaces
-        let normalized = trimmed.replace(',', ".").replace(' ', "");
-
-        // Handle trailing dot or comma (e.g., "100," means 100.00)
-        let normalized = if normalized.ends_with('.') {
-            format!("{}00", normalized)
-        } else {
-            normalized
-        };
-
-        normalized
-            .parse::<f64>()
+        utils::parse_amount(amount_str)
             .map_err(|_| ParseError::Mt940Error(format!("Invalid amount: {}", amount_str)))
     }
 

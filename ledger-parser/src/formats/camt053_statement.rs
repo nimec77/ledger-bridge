@@ -64,6 +64,9 @@ impl Camt053Statement {
             return Err(ParseError::Camt053Error("Empty input".into()));
         }
 
+        // Fix non-breaking spaces in XML attributes (c2 a0 bytes)
+        let content = content.replace("\u{00a0}", " ");
+
         let mut xml_reader = quick_xml::Reader::from_str(&content);
         xml_reader.config_mut().trim_text(true);
 

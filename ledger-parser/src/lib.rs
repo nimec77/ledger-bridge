@@ -108,6 +108,8 @@ mod model;
 mod formats {
     pub(crate) mod camt053_statement;
     pub(crate) mod csv_statement;
+    pub(crate) mod cvs_const;
+    pub(crate) mod formats_const;
     pub(crate) mod mt940_statement;
     pub(crate) mod utils;
 
