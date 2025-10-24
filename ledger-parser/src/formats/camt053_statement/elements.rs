@@ -4,7 +4,7 @@ use strum_macros::{Display, EnumString};
 
 use crate::error::ParseError;
 
-#[derive(Clone, Copy, PartialEq, Eq, EnumString, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumString, Display)]
 #[strum(ascii_case_insensitive)]
 pub(super) enum ElementName {
     #[strum(serialize = "Document")]
@@ -85,7 +85,10 @@ impl ElementName {
         })?;
         let normalized = name.rsplit(':').next().unwrap_or(name);
 
-        ElementName::from_str(normalized)
-            .map_err(|err| ParseError::Camt053Error(format!("Invalid XML tag name: {}", err)))
+        // Try to parse as known element, fall back to Other for unknown tags
+        match ElementName::from_str(normalized) {
+            Ok(element) => Ok(element),
+            Err(_) => Ok(ElementName::Other), // Unknown tags become Other
+        }
     }
 }

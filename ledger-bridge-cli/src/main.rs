@@ -37,15 +37,14 @@ enum Statement {
     Camt053(Camt053Statement),
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse command-line arguments
     let cli = Cli::parse();
 
-    // Execute conversion and handle errors
-    if let Err(e) = run_conversion(cli) {
-        eprintln!("Error: {}", e);
-        std::process::exit(1);
-    }
+    // Execute conversion
+    run_conversion(cli)?;
+
+    Ok(())
 }
 
 /// Main conversion logic
